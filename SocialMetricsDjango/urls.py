@@ -10,6 +10,7 @@ urlsAPI = [
 ]
 
 urlsView = [
+    path('test',views.test, name='test'),
     # path('twitter',views.twitter, name='twitter'),
     # path('youtube',views.youtube, name='youtube'),
     # path('instagram',views.instagram, name='instagram'),
