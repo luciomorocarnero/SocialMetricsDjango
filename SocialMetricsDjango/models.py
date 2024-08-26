@@ -23,26 +23,30 @@ class ServiceRequest(models.Model):
         return f"Request {self.id} for {self.service} at {self.created_at.isoformat()}"
 
     @classmethod
-    def last_request(
-        cls, 
+    def _last_request(
+        cls,
         service: str,
-        params: dict
-        ):
-        return cls.objects.filter(service=service).filter(params=params).order_by('-created_at').first()
+        params: dict,
+        date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+    ):
+        """
+        Search last response after selected date
+        
+        :param service: service of the object like 'Twitter' or 'Youtube'
+        :param params: params of the object like {"userName": "name"}
+        :param datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return cls.objects.filter(service=service).filter(params=params).filter(created_at__lte=date_time).order_by('-created_at').first()
     
-    @classmethod
-    def exist_request(
-        cls, 
-        service: str, 
-        params: dict, 
-        time: datetime.timedelta = datetime.timedelta(days=1)
-        ):
-        last_request = cls.last_request(service,params)
-        if last_request is None:
-            return False
-        last_request_date = last_request.created_at
-        now = datetime.datetime.now(datetime.timezone.utc)
-        date_delta = now - time
-        return last_request_date > date_delta
-    
-    
+    def last_request(
+        self,
+        date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+    ):
+        """
+        Search last response after selected date of the object
+        
+        :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return ServiceRequest._last_request(service=self.service, params=self.params, date_time=date_time)
