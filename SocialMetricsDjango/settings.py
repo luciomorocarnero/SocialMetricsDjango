@@ -7,7 +7,6 @@ load_dotenv()
 # KEYS
 YOUTUBE_KEY = os.getenv('YOUTUBE_KEY')
 
-
 # Twitter
 class TwitterConfig:
     MAX_TWEETS: int = 20

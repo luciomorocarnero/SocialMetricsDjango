@@ -2,7 +2,6 @@ from django.db import models
 import datetime
 import uuid
 from zoneinfo import ZoneInfo 
-
 # Create your models here.
 class ServiceRequest(models.Model):
     """Django Model for db of the requests"""
@@ -22,7 +21,7 @@ class ServiceRequest(models.Model):
     data = models.JSONField()
     
     def __str__(self):
-        return f"Request {self.id} for {self.service} at {self.created_at.isoformat()}"
+        return f"Request for {self.service} at {self.created_at.astimezone().strftime(format=r'%Y-%m-%d %H:%M:%S')}"
 
     @classmethod
     def _last_request(
