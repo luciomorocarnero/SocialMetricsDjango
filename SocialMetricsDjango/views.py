@@ -9,6 +9,6 @@ import datetime
 def test(request):
     response = {}
     modelo = APITwitter('joerogan')
-    # response = modelo.get()
-    print(modelo.all())
+    a = modelo.all(unique=False)
+    print(a)
     return JsonResponse(response, safe=False)

@@ -49,7 +49,7 @@ class APIBase:
         response = {
             'status': HTTPStatus.OK,
             'cache_response': True,
-            'date': last_request.created_at.date().isoformat(),
+            'cache_date': last_request.created_at.date().isoformat(),
             'result': last_request.data
         }
         
@@ -138,7 +138,7 @@ class APITwitter(APIBase):
                 'user': tweet.get('user', {}),
                 'url': tweet.get('link','#'),
                 'text': tweet.get('text', ''),
-                'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else '',
+                'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else TwitterConfig.DEFAULT_IMG,
                 'video': tweet.get('videos', [TwitterConfig.DEFAULT_VIDEO]),
                 'statistics': stats,
                 'datetime': dateparser.parse(tweet.get('date', '26/06/2003 15:00')).isoformat()
@@ -174,12 +174,9 @@ class APITwitter(APIBase):
         """
         return self._last_request(self.params, date_time)
     
-    def all(self):
-        return super()._all().filter(params=self.params)
-    
-    class Statistics:
-        def __init__(self, parent):
-            self.parent = parent
-        
-        def history(self):
-            return self.parent.all()
+    def all(self, unique = False):
+        data = super()._all().filter(params=self.params)
+        if not unique:
+            return data
+        days = set([q.created_at.date() for q in data])
+        return [data.filter(created_at__date=day).first() for day in days]
