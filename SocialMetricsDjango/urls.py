@@ -3,7 +3,7 @@ from . import views
 
 
 urlsAPI = [
-    # path('api/twitter',views.api_twitter, name='api_twitter'),
+    path('api/twitter',views.api_twitter, name='api_twitter'),
     # path('api/youtube',views.api_youtube, name='api_youtube'),
     # path('api/instagram',views.api_instagram, name='api_instagram'),
     # path('api/facebook',views.api_facebook, name='api_facebook'),    

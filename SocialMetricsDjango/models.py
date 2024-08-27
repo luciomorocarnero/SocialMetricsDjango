@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo
 
 # Create your models here.
 class ServiceRequest(models.Model):
+    """Django Model for db of the requests"""
+    
     SERVICES = (
         ('Twitter', 'Twitter'),
         ('Youtube','Youtube'),

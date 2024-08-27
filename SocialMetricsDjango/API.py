@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class APIBase:
+    """Base model for APIs managment, saves and search request"""
     
     def __init__(self, service: str) -> None:
         assert service in [ser[0] for ser in ServiceRequest.SERVICES], ValueError('No service support')
@@ -37,7 +38,14 @@ class APIBase:
         params: dict, 
         cache_time: datetime.timedelta = TwitterConfig.CACHE_TIMEDELTA
         ):
+        """
+        Search last request till the cache_time
         
+        :param params: params for searching requests
+        :param cache_time: timedelta object for search requests, can cahce in TwitterConfig in SocialMetricsDjango/setting.py
+        
+        :return: a response with status, cache_reponse: bool, cache_date, result
+        """    
         last_request = self._last_request(params)
         if not last_request:
             return None
@@ -138,7 +146,7 @@ class APITwitter(APIBase):
                 'user': tweet.get('user', {}),
                 'url': tweet.get('link','#'),
                 'text': tweet.get('text', ''),
-                'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else TwitterConfig.DEFAULT_IMG,
+                'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else '',
                 'video': tweet.get('videos', [TwitterConfig.DEFAULT_VIDEO]),
                 'statistics': stats,
                 'datetime': dateparser.parse(tweet.get('date', '26/06/2003 15:00')).isoformat()
@@ -175,8 +183,18 @@ class APITwitter(APIBase):
         return self._last_request(self.params, date_time)
     
     def all(self, unique = False):
+        """
+        Return a list of requests
+        
+        :param unique: gives only a set of requests by days
+        """
         data = super()._all().filter(params=self.params)
         if not unique:
             return data
         days = set([q.created_at.date() for q in data])
         return [data.filter(created_at__date=day).first() for day in days]
+    
+    def history(self):
+        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
+        data = self.all(unique=True)
+        return [{'date':x.created_at.date().isoformat(), 'data':x.data.get('profile', {})} for x in data]
