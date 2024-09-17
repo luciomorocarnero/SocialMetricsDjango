@@ -197,4 +197,4 @@ class APITwitter(APIBase):
     def history(self):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
         data = self.all(unique=True)
-        return [{'date':x.created_at.date().isoformat(), 'data':x.data.get('profile', {})} for x in data]
+        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]

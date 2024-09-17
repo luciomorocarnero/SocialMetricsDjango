@@ -30,6 +30,7 @@ def api_twitter(request):
     if history:
         response = {
             'status': HTTPStatus.OK,
+            'user': api.username,
             'result': api.history()
         }
         return JsonResponse(response, safe=False)
