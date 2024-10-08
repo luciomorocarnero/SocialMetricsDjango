@@ -14,6 +14,19 @@ def test(request):
     # print(a.first().data)
     return JsonResponse(response, safe=False)
 
+def endpoints(request):
+    endpoints = [
+        {
+            'url': 'api/twitter',
+            'params': {
+                'userName': "userName of the twitter profile like 'joerogan'",
+                'history': "if exists return twitter profile history stats, unique for each day",
+                'update': "force scrape and bypass cache"
+            }
+        }
+    ]
+    return JsonResponse(endpoints, safe=False)
+
 def api_twitter(request):
     userName = request.GET.get('userName')
     history = request.GET.get('history')

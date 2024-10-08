@@ -201,11 +201,13 @@ class APITwitter(APIBase):
     
 class APIYoutube(APIBase):
     
-    def __init__(self, username: str) -> None:
+    def __init__(self, id: str) -> None:
         super().__init__('Youtube')
-        self.username = username
+        self.id = id
         self.params = {
-            'userName': self.username
+            'id': self.id
         }
-        
     
+    def by_userName(self, username):
+        assert '@' in username and not ' ' in username, "The username must start with '@' and must not have spaces."
+        id = super()._all().filter()
