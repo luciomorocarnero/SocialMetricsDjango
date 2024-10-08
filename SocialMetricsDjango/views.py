@@ -5,13 +5,13 @@ from .API import *
 import json
 import datetime
 from http import HTTPStatus
-
+from .settings import YoutubeConfig
 # Create your views here.
 def test(request):
     response = {}
-    modelo = APITwitter('joerogan')
-    a = modelo.all(unique=False)
-    print(a)
+    # modelo = APITwitter('joerogan')
+    # a = modelo.all(unique=False)
+    # print(a.first().data)
     return JsonResponse(response, safe=False)
 
 def api_twitter(request):
@@ -37,6 +37,3 @@ def api_twitter(request):
     
     response = api.get(cache=False) if update else api.get()
     return JsonResponse(response, safe=False)
-        
-        
-    # api = APITwitter()

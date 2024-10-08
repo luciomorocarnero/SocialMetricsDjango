@@ -117,7 +117,7 @@ class APITwitter(APIBase):
         if not tweets or not profile:
             logging.error('Twitter Scraper no fetch')
             return {
-                'status': HTTPStatus.BAD_REQUEST,
+                'status': HTTPStatus.INTERNAL_SERVER_ERROR,
                 'error': "Twitter Scraper couldn't fetch data"    
                 }
             
@@ -160,7 +160,7 @@ class APITwitter(APIBase):
 
         total_tweets = len(tweets)
         if total_tweets > 0:
-            more_statistics = {key: str(round(value / total_tweets)) for key, value in more_statistics.items()}
+            more_statistics = {key: round(value / total_tweets) for key, value in more_statistics.items()}
         else:
             more_statistics = {key: 0 for key, value in more_statistics.items()}
         data['profile'] = profile
@@ -198,3 +198,14 @@ class APITwitter(APIBase):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
         data = self.all(unique=True)
         return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+    
+class APIYoutube(APIBase):
+    
+    def __init__(self, username: str) -> None:
+        super().__init__('Youtube')
+        self.username = username
+        self.params = {
+            'userName': self.username
+        }
+        
+    
