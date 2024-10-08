@@ -5,13 +5,12 @@ from .API import *
 import json
 import datetime
 from http import HTTPStatus
-from .settings import YoutubeConfig
+
 # Create your views here.
 def test(request):
     response = {}
-    # modelo = APITwitter('joerogan')
-    # a = modelo.all(unique=False)
-    # print(a.first().data)
+    model = APIYoutube().by_userName('@joerogan')
+    print(model.id)
     return JsonResponse(response, safe=False)
 
 def endpoints(request):

@@ -201,13 +201,26 @@ class APITwitter(APIBase):
     
 class APIYoutube(APIBase):
     
-    def __init__(self, id: str) -> None:
+    def __init__(self, id: str = None) -> None:
         super().__init__('Youtube')
         self.id = id
         self.params = {
             'id': self.id
         }
     
-    def by_userName(self, username):
-        assert '@' in username and not ' ' in username, "The username must start with '@' and must not have spaces."
-        id = super()._all().filter()
+    @classmethod
+    def by_userName(cls, username):
+        if not username.startswith('@') or ' ' in username:
+            logger.error("The username must start with '@' and must not have spaces.")
+        # Buscar en la base de datos
+        service_request = ServiceRequest.objects.filter(service='Youtube', data__profile__userName__iexact=username).first()
+
+        if service_request:
+            youtube_id = service_request.data.get('profile', {}).get('id')
+            return cls(id=youtube_id)
+        else:
+            logger.info(f"No YouTube profile found for username: {username}")
+            return None
+            
+
+    
