@@ -21,8 +21,9 @@ class APIBase:
         try:
             model = ServiceRequest(service=self.service, params=params, data=data)
             model.save()
+            logger.info(f'APIBase - {self.service} - saving request:')
         except Exception as e:
-            logger.error(f'Twitter error saving request: {e}')
+            logger.error(f'APIBase - {self.service} - error saving request: {e}')
 
     def _all(self):
         return ServiceRequest.objects.filter(service=self.service)
@@ -48,10 +49,12 @@ class APIBase:
         """    
         last_request = self._last_request(params)
         if not last_request:
+            logger.debug(f'APIBase - {self.service} - {params} - Cache - No last requests')
             return None
         
         date = datetime.datetime.now(datetime.timezone.utc) - cache_time
         if last_request.created_at < date:
+            logger.debug(f'APIBase - - {self.service} - {params} - Cache - last_request.created_at < cache_date')
             return None
         
         response = {
@@ -61,7 +64,6 @@ class APIBase:
             'result': last_request.data
         }
         
-        logging.info(f'{self.service} Data Cache Response')           
         return response
     
     
@@ -78,14 +80,14 @@ class APITwitter(APIBase):
         try:
             return scraper.get_tweets(self.username, mode='user', number=TwitterConfig.MAX_TWEETS).get('tweets', [])
         except Exception as e:
-            logger.error(f"Error fetching tweets: {e}")
+            logger.error(f'APITwitter - Error fetching tweets - userName: "{self.username}" - {e}')
             return []
         
     def __get_profile_info(self, scraper) -> dict:
         try:
             return scraper.get_profile_info(self.username)
         except Exception as e:
-            logger.error(f"Error fetching profile info: {e}")
+            logger.error(f'APITwitter - Error fetching profile info userName: "{self.username}" - {e}')
             return {}
         
     def get(self, cache: bool = True) -> dict:
@@ -109,19 +111,21 @@ class APITwitter(APIBase):
         if cache:
             response = self._cache(self.params)
             if response:
+                logger.info(f'{self.service} Data Cache Response Success for "{self.username}"')
                 return response
         
+        logger.info(f'APITwitter - Making Scrape for "{self.username}"')
         scraper = Nitter(log_level=TwitterConfig.LOG_LEVEL, skip_instance_check=TwitterConfig.SKIP_INSTANCE_CHECK)
         tweets = self.__get_tweets(scraper)
         profile = self.__get_profile_info(scraper)
         if not tweets or not profile:
-            logging.error('Twitter Scraper no fetch')
+            logger.error(f'APITwitter - Twitter Scraper no fetch for "{self.username}"')
             return {
                 'status': HTTPStatus.INTERNAL_SERVER_ERROR,
                 'error': "Twitter Scraper couldn't fetch data"    
                 }
             
-        logging.info('Twitter Data Fetch ok')           
+        logger.info(f'APITwitter - Twitter Data Fetch ok for "{self.username}"')           
         response = {
             'status': HTTPStatus.OK,
             'cache_response': False,
@@ -132,7 +136,7 @@ class APITwitter(APIBase):
         
     def __clean(self, profile, tweets) -> dict:
         """Clear fetched data and add statistics """
-        
+        logger.debug(f'APITwitter - Cleaning Data for "{self.username}"')
         tweets = [tweet for tweet in tweets if self.username in tweet.get('link', '')]
         data = {
             'profile': {},
@@ -201,7 +205,7 @@ class APITwitter(APIBase):
     
 class APIYoutube(APIBase):
     
-    def __init__(self, id: str = None) -> None:
+    def __init__(self, id: str) -> None:
         super().__init__('Youtube')
         self.id = id
         self.params = {
@@ -209,18 +213,19 @@ class APIYoutube(APIBase):
         }
     
     @classmethod
-    def by_userName(cls, username):
-        if not username.startswith('@') or ' ' in username:
-            logger.error("The username must start with '@' and must not have spaces.")
-        # Buscar en la base de datos
-        service_request = ServiceRequest.objects.filter(service='Youtube', data__profile__userName__iexact=username).first()
+    def by_userName(cls, userName: str): 
+        if not userName.startswith('@') or ' ' in userName:
+            logger.error(f'APIYoutube - "{userName}" -The username must start with '@' and must not have spaces.')
+            return None
+        service_request = ServiceRequest.objects.filter(service='Youtube', data__profile__userName__iexact=userName).first()
 
         if service_request:
             youtube_id = service_request.data.get('profile', {}).get('id')
+            logger.info(f'APIYoutube - Find id: "{youtube_id}" for userName: "{userName}"')
             return cls(id=youtube_id)
         else:
-            logger.info(f"No YouTube profile found for username: {username}")
+            logger.info(f'APIYoutube - No YouTube profile id found for username: "{userName}"')
+            logger.info(f'APIYoutube - Making profile request for "{userName}"')
             return None
-            
-
+    # def 
     

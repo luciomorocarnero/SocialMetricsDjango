@@ -5,12 +5,15 @@ from .API import *
 import json
 import datetime
 from http import HTTPStatus
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 def test(request):
     response = {}
-    model = APIYoutube().by_userName('@joerogan')
-    print(model.id)
+    model = APIYoutube.by_userName('@joerogan')
+    # print(model.id)
     return JsonResponse(response, safe=False)
 
 def endpoints(request):
@@ -47,5 +50,10 @@ def api_twitter(request):
         }
         return JsonResponse(response, safe=False)
     
-    response = api.get(cache=False) if update else api.get()
+    if update:
+        logger.info('api_twitter - Forcing update')
+        response = api.get(cache=False)
+    else:
+        response = api.get()
+    
     return JsonResponse(response, safe=False)
