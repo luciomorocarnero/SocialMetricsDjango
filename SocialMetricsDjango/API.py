@@ -4,11 +4,13 @@ from .settings import *
 import logging
 import datetime
 from http import HTTPStatus
-from ntscraper import Nitter #Scrapper For twitter
 import dateparser
+from dataclasses import dataclass
+
+from ntscraper import Nitter #Scrapper For twitter
+import requests
 
 logger = logging.getLogger(__name__)
-
 
 class APIBase:
     """Base model for APIs managment, saves and search request"""
@@ -65,7 +67,52 @@ class APIBase:
         }
         
         return response
-    
+
+class RequestsHandler:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+
+    def make_request(self, endpoint: str, params: dict = None, headers: dict = None) -> dict:
+        """
+        Makes a GET request to the specified endpoint with optional query parameters and headers.
+        
+        The method automatically handles common exceptions like HTTP errors, timeouts, 
+        and too many redirects, logging the appropriate error message if any issue arises.
+        
+        :param endpoint: The API endpoint to which the request will be made (e.g., "/data").
+        :param params: Optional dictionary of query parameters to include in the request.
+        :param headers: Optional dictionary of HTTP headers to include in the request.
+        
+        :return: A dictionary containing the JSON response from the server, or an empty dictionary 
+                 if an error occurred or no valid response was received.
+                 
+        :raises: Requests exceptions such as HTTPError, Timeout, TooManyRedirects, etc., are caught
+                 and logged, but not re-raised.
+        """
+        url = f"{self.base_url}{endpoint}"
+        logger.debug(f'RequestsHandler - Making GET request to "{url}" with params {params} and headers {headers}')
+        
+        params = params or {}
+        headers = headers or {}
+
+        try:
+            response = requests.get(url, params=params, headers=headers)
+            response.raise_for_status()
+
+            logger.info(f'Response from {url} received successfully. Status Code: {response.status_code}')
+            return response.json()
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(f'HTTPError - URL: {url}, Status Code: {response.status_code}, Response: {response.text}')
+        except requests.exceptions.Timeout as e:
+            logger.error(f'Request to {url} timed out: {e}')
+        except requests.exceptions.TooManyRedirects as e:
+            logger.error(f'TooManyRedirects - URL: {url}, Error: {e}')
+        except requests.exceptions.RequestException as e:
+            logger.error(f'Request failed: {e}')
+
+        return {}
+        
     
 class APITwitter(APIBase):
     
@@ -207,13 +254,31 @@ class APIYoutube(APIBase):
     
     def __init__(self, id: str) -> None:
         super().__init__('Youtube')
+        
+        self.base_url = "https://www.googleapis.com/youtube/v3"
+        if not YoutubeConfig.KEY:
+            raise ValueError('Not youtube key loaded')
+        self.api_key = YoutubeConfig.KEY
+        
         self.id = id
         self.params = {
             'id': self.id
         }
     
     @classmethod
-    def by_userName(cls, userName: str): 
+    def by_userName(cls, userName: str):
+        """
+        Retrieves the YouTube API object based on a given username.
+
+        This method searches for an existing profile linked to the provided username. 
+        If a matching profile is found, it returns an instance of the APIYoutube class 
+        initialized with the relevant ID. If no profile is found, make a requests to
+        youtube api
+
+        :param userName: A string representing the username to search for.
+                         
+        :return: An instance of the APIYoutube class if a profile is found.
+        """
         if not userName.startswith('@') or ' ' in userName:
             logger.error(f'APIYoutube - "{userName}" -The username must start with '@' and must not have spaces.')
             return None
@@ -226,6 +291,8 @@ class APIYoutube(APIBase):
         else:
             logger.info(f'APIYoutube - No YouTube profile id found for username: "{userName}"')
             logger.info(f'APIYoutube - Making profile request for "{userName}"')
-            return None
+            ...
+            
+
     # def 
     
