@@ -23,9 +23,9 @@ class APIBase:
         try:
             model = ServiceRequest(service=self.service, params=params, data=data)
             model.save()
-            logger.info(f'APIBase - {self.service} - saving request:')
+            logger.info(f'APIBase - service: {self.service} - saving request on "{params}"')
         except Exception as e:
-            logger.error(f'APIBase - {self.service} - error saving request: {e}')
+            logger.error(f'APIBase - service: {self.service} - error saving request: {e}')
 
     def _all(self):
         return ServiceRequest.objects.filter(service=self.service)
@@ -39,7 +39,7 @@ class APIBase:
     def _cache(
         self,
         params: dict, 
-        cache_time: datetime.timedelta = TwitterConfig.CACHE_TIMEDELTA
+        cache_time: datetime.timedelta
         ):
         """
         Search last request till the cache_time
@@ -51,12 +51,12 @@ class APIBase:
         """    
         last_request = self._last_request(params)
         if not last_request:
-            logger.debug(f'APIBase - {self.service} - {params} - Cache - No last requests')
+            logger.debug(f'APIBase - service: {self.service} - {params} - Cache - No last requests')
             return None
         
         date = datetime.datetime.now(datetime.timezone.utc) - cache_time
         if last_request.created_at < date:
-            logger.debug(f'APIBase - - {self.service} - {params} - Cache - last_request.created_at < cache_date')
+            logger.debug(f'APIBase - service: {self.service} - {params} - Cache - last_request.created_at < cache_date')
             return None
         
         response = {
@@ -89,27 +89,27 @@ class RequestsHandler:
         :raises: Requests exceptions such as HTTPError, Timeout, TooManyRedirects, etc., are caught
                  and logged, but not re-raised.
         """
-        url = f"{self.base_url}{endpoint}"
-        logger.debug(f'RequestsHandler - Making GET request to "{url}" with params {params} and headers {headers}')
-        
         params = params or {}
         headers = headers or {}
+        url = f"{self.base_url}{endpoint}"
+        logger.info(f'RequestsHandler - Making GET request to "{url}"')
+        
 
         try:
             response = requests.get(url, params=params, headers=headers)
             response.raise_for_status()
 
-            logger.info(f'Response from {url} received successfully. Status Code: {response.status_code}')
+            logger.info(f'RequestsHandler - Response from {url} received successfully. Status Code: {response.status_code}')
             return response.json()
 
         except requests.exceptions.HTTPError as e:
-            logger.error(f'HTTPError - URL: {url}, Status Code: {response.status_code}, Response: {response.text}')
+            logger.error(f'RequestsHandler - HTTPError - URL: {url}, Status Code: {response.status_code}, Response: {response.text}')
         except requests.exceptions.Timeout as e:
-            logger.error(f'Request to {url} timed out: {e}')
+            logger.error(f'RequestsHandler - Request to {url} timed out: {e}')
         except requests.exceptions.TooManyRedirects as e:
-            logger.error(f'TooManyRedirects - URL: {url}, Error: {e}')
+            logger.error(f'RequestsHandler - TooManyRedirects - URL: {url}, Error: {e}')
         except requests.exceptions.RequestException as e:
-            logger.error(f'Request failed: {e}')
+            logger.error(f'RequestsHandler - Request failed: {e}')
 
         return {}
         
@@ -156,9 +156,9 @@ class APITwitter(APIBase):
             - 'tweets' (list): A list of dictionaries where each dictionary represents a tweet.
         """
         if cache:
-            response = self._cache(self.params)
+            response = self._cache(self.params,cache_time=TwitterConfig.CACHE_TIMEDELTA)
             if response:
-                logger.info(f'{self.service} Data Cache Response Success for "{self.username}"')
+                logger.info(f'APITwitter - {self.service} Data Cache Response Success for "{self.username}"')
                 return response
         
         logger.info(f'APITwitter - Making Scrape for "{self.username}"')
@@ -172,7 +172,7 @@ class APITwitter(APIBase):
                 'error': "Twitter Scraper couldn't fetch data"    
                 }
             
-        logger.info(f'APITwitter - Twitter Data Fetch ok for "{self.username}"')           
+        logger.info(f'APITwitter - Twitter Data Fetch success for "{self.username}"')           
         response = {
             'status': HTTPStatus.OK,
             'cache_response': False,
@@ -252,21 +252,21 @@ class APITwitter(APIBase):
     
 class APIYoutube(APIBase):
     
-    def __init__(self, id: str) -> None:
+    base_url = "https://www.googleapis.com/youtube/v3"
+
+    
+    def __init__(self, id: str, api_key: str) -> None:
         super().__init__('Youtube')
         
-        self.base_url = "https://www.googleapis.com/youtube/v3"
-        if not YoutubeConfig.KEY:
-            raise ValueError('Not youtube key loaded')
-        self.api_key = YoutubeConfig.KEY
+        self.api_key = api_key
         
         self.id = id
         self.params = {
             'id': self.id
         }
-    
+        
     @classmethod
-    def by_userName(cls, userName: str):
+    def by_userName(cls, userName: str, api_key: str):
         """
         Retrieves the YouTube API object based on a given username.
 
@@ -276,6 +276,7 @@ class APIYoutube(APIBase):
         youtube api
 
         :param userName: A string representing the username to search for.
+        :param api_key: A string containing the youtube v3 api.
                          
         :return: An instance of the APIYoutube class if a profile is found.
         """
@@ -287,12 +288,172 @@ class APIYoutube(APIBase):
         if service_request:
             youtube_id = service_request.data.get('profile', {}).get('id')
             logger.info(f'APIYoutube - Find id: "{youtube_id}" for userName: "{userName}"')
-            return cls(id=youtube_id)
-        else:
-            logger.info(f'APIYoutube - No YouTube profile id found for username: "{userName}"')
-            logger.info(f'APIYoutube - Making profile request for "{userName}"')
-            ...
-            
-
-    # def 
+            return cls(id=youtube_id, api_key=api_key)
+        
+        logger.info(f'APIYoutube - No YouTube profile id found for username: "{userName}"')
+        logger.info(f'APIYoutube - Making profile request for "{userName}"')
+        params = {
+            'forHandle': userName,
+            'part': 'id',
+            'key': api_key
+        }
+        response = RequestsHandler(APIYoutube.base_url).make_request('/channels', params=params)
+        
+        if not response:
+            return None
+        if not response.get('pageInfo', {}).get('totalResults', 0) == 1:
+            logger.error(f'APIYoutube - More than one profile finded for "{userName}"')
+            return None
+        
+        youtube_id = response.get('items', [])[0].get('id') if response.get('items', []) else None
+        if not youtube_id:
+            logger.error(f'APIYoutube - Error finding youtube id in response for {userName}')
+            return None
+        
+        return cls(id=youtube_id, api_key=api_key)
     
+    def __get_profile(self):
+        params = {
+            'part': 'statistics,status,snippet',
+            'id': self.id,
+            'key': self.api_key
+        }
+        response = RequestsHandler(self.base_url).make_request('/channels',params=params)
+        if not response:
+            logger.error(f'APIYoutube - error fetching __get_profile for id: "{self.id}"')
+            return None
+        if not response.get('pageInfo', {}).get('totalResults', 0) == 1:
+            logger.critical(f'APIYoutube - No channel found for id: "{self.id}"')
+            return None
+        return response
+    
+    def __get_videos(self):
+        params = {
+            'channelId': self.id,
+            'maxResults': YoutubeConfig.MAX_RESULTS,
+            'order': 'date',
+            'type': 'video',
+            'key': self.api_key
+        }
+        response = RequestsHandler(self.base_url).make_request('/search', params=params)
+        if not response:
+            logger.error(f'APIYoutube - error fetching "__get_videos /search" for id "{self.id}"')
+            return None
+        
+        videos_items = response.get('items', [])
+        if not videos_items:
+            logger.error(f'APIYoutube - error no items in "__get_videos /search" response for id "{self.id}"')
+            return None
+        videos =  ",".join([video['id']['videoId'] for video in videos_items])
+        params = {
+            'part': 'id,snippet,statistics',
+            'id': videos,
+            'key': self.api_key or YoutubeConfig.KEY
+        }
+        response = RequestsHandler(self.base_url).make_request('/videos', params)
+        if not response:
+            logger.error(f'APIYoutube - error no items in "__get_videos /videos" response for id "{self.id}" videos_str: "videos"')
+            return None
+        return response
+    
+    def get(self, cache: bool = True):
+        if cache:
+            response = self._cache(self.params, cache_time=YoutubeConfig.CACHE_TIMEDELTA)
+            if response:
+                logger.info(f'APIYoutube - {self.service} Data Cache Response Success for "{self.id}"')
+                return response
+        
+        logger.info(f'APIYoutube - Making API request for id: "{self.id}"')    
+        profile = self.__get_profile()
+        videos = self.__get_videos()
+        if not videos or not profile:
+            logger.error(f'APIYoutube - error in get request for {self.id}')
+            return {
+                'status': HTTPStatus.INTERNAL_SERVER_ERROR,
+                'error': "Youtube API couldn't fetch data"    
+                }
+            
+        logger.info(f'APIYoutube - Youtube data fetch success for id: "{self.id}"')    
+        response = {
+            'status': HTTPStatus.OK,
+            'cache_response': False,
+            'result': self.__clean(profile,videos) or {'profile': profile, "videos":videos, 'cleaned': False}
+        }
+        self.save(response['result'])
+        return response
+
+    def __clean(self,profile, videos) -> dict:
+        logger.debug(f'APIYoutube - Cleaning Data for id: "{self.id}"')
+        profile = profile.get('items', [])[0]
+        data = {
+            'profile': {
+                'name': profile.get('snippet', {}).get('title'),
+                'userName': profile.get('snippet', {}).get('customUrl'),
+                'id': profile.get('id'),
+                'joined': profile.get('snippet', {}).get('publishedAt'),
+                'image': profile.get('snippet', {}).get('thumbnails', {}).get('high', {}).get('url', YoutubeConfig.DEFAULT_IMG),
+                'country': profile.get('snippet', {}).get('country'),
+                'stats': {
+                    'views': int(profile.get('statistics', {}).get('viewCount',0)),
+                    'subscribers': int(profile.get('statistics', {}).get('subscriberCount',0)),
+                    'videos': int(profile.get('statistics', {}).get('videoCount',0))
+                }
+                },
+            'videos': []
+        }
+        more_statistics = {'avgViews':0, 'avgLikes':0,'avgComments':0}
+        
+        videos = videos.get('items', [])
+        for video in videos:
+            snippet = video.get('snippet', {})
+            stats = video.get('statistics', {})
+            data['videos'].append({
+                'id': video.get('id'),
+                'title': snippet.get('title'),
+                'publishedAt': snippet.get('publishedAt'),
+                'image': snippet.get('thumbnails', {}).get('standard', {}).get('url', YoutubeConfig.DEFAULT_IMG), # 640 x 480
+                'statistics': dict(zip(stats.keys(), map(lambda x: int(x) if x.isdigit() else 0, stats.values()))),
+            })
+            more_statistics['avgViews'] += int(stats.get('viewCount', 0))   
+            more_statistics['avgLikes'] += int(stats.get('likeCount', 0))   
+            more_statistics['avgComments'] += int(stats.get('commentCount', 0))   
+        
+        total_videos = len(videos)
+        if total_videos > 0:
+            more_statistics = {key: round(value / total_videos) for key, value in more_statistics.items()}
+        else:
+            more_statistics = {key: 0 for key, value in more_statistics.items()}
+        
+        data['profile']['stats'].update(more_statistics)
+        
+        return data
+
+    def save(self, data: dict) -> None:
+        """Save the response to the db"""
+        self._save(params=self.params, data=data)
+
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+        """
+        Search last response after selected date of the object
+        
+        :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return self._last_request(self.params, date_time)
+    
+    def all(self, unique = False):
+        """
+        Return a list of requests
+        
+        :param unique: gives only a set of requests by days
+        """
+        data = super()._all().filter(params=self.params)
+        if not unique:
+            return data
+        days = set([q.created_at.date() for q in data])
+        return [data.filter(created_at__date=day).first() for day in days]
+    
+    def history(self):
+        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
+        data = self.all(unique=True)
+        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
