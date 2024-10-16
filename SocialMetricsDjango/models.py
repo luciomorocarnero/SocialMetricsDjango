@@ -1,5 +1,4 @@
 from django.db import models
-from asgiref.sync import sync_to_async
 import datetime
 import uuid
 from zoneinfo import ZoneInfo
