@@ -9,11 +9,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Create your views here.
 def test(request):
     response = {}
-    api = APIIntagram('joerogan')
-    response = api.get()
     return JsonResponse(response, safe=False)
 
 # TODO: Complete Enpoints
@@ -29,6 +26,14 @@ def endpoints(request):
         },
         {
             'url': 'api/youtube',
+            'params': {
+                'userName': "Return id of userName if this is found",
+                'history': "return youtube profile history stats, unique for each day",
+                'update': "force scrape and bypass cache"
+            }
+        },
+        {
+            'url': 'api/instagram',
             'params': {
                 'userName': "Return id of userName if this is found",
                 'history': "return youtube profile history stats, unique for each day",
@@ -67,7 +72,6 @@ def api_twitter(request):
     
     return JsonResponse(response, safe=False)
 
-# TODO: Complete view
 def api_youtube(request):
     id = request.GET.get('id')
     userName = request.GET.get('userName')
@@ -95,6 +99,35 @@ def api_youtube(request):
     
     if update:
         logger.info('api_youtube - Forcing update')
+        response = api.get(cache=False)
+    else:
+        response = api.get(cache=True)
+    
+    return JsonResponse(response, safe=False)
+
+def api_instagram(request):
+    userName = request.GET.get('userName')
+    history = request.GET.get('history')
+    update = request.GET.get('update')
+    if not userName:
+        response =  {
+            'status': HTTPStatus.BAD_REQUEST,
+            'error': 'Must provide a userName'
+        }
+        return JsonResponse(response, safe=False)
+    
+    api = APIIntagram(userName)
+    
+    if history:
+        response = {
+            'status': HTTPStatus.OK,
+            'user': api.userName,
+            'result': api.history()
+        }
+        return JsonResponse(response, safe=False)
+    
+    if update:
+        logger.info('api_instagram - Forcing update')
         response = api.get(cache=False)
     else:
         response = api.get(cache=True)

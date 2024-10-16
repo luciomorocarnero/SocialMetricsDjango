@@ -52,12 +52,12 @@ class APIBase:
         """    
         last_request = self._last_request(params)
         if not last_request:
-            logger.debug(f'APIBase - service: {self.service} - {params} - Cache - No last requests')
+            logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - No last requests')
             return None
         
         date = datetime.datetime.now(datetime.timezone.utc) - cache_time
         if last_request.created_at < date:
-            logger.debug(f'APIBase - service: {self.service} - {params} - Cache - last_request.created_at < cache_date')
+            logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - last_request.created_at < cache_date')
             return None
         
         response = {
@@ -121,7 +121,7 @@ class APITwitter(APIBase):
         super().__init__('Twitter')
         self.username = username
         self.params = {
-            'userName': self.username
+            'username': self.username
         }
         
     def __get_tweets(self, scraper) -> list:
@@ -464,7 +464,7 @@ class APIIntagram(APIBase):
         super().__init__("Instagram")
         self.userName = userName
         self.params = {
-            "id": self.userName
+            "username": self.userName
         }
 
     def __get(self):
@@ -475,7 +475,6 @@ class APIIntagram(APIBase):
                 'username': profile.username,
                 'image': profile.profile_pic_url,
                 'id': profile.userid,
-                ''
                 'stats': {
                     'following': profile.followees,
                     'followers': profile.followers,
@@ -501,7 +500,7 @@ class APIIntagram(APIBase):
                 image = InstagramConfig.DEFAULT_IMG
             p = {
                 'id': info.get('id'),
-                'publishedAt': info.get('date'),
+                'publishedAt': datetime.datetime.fromtimestamp(info.get('date')).isoformat(),
                 'image': image,
                 'title': info.get('title'),
                 'caption': info.get('caption'),
@@ -519,3 +518,57 @@ class APIIntagram(APIBase):
             
             return d
         
+    def get(self, cache: bool = True):
+        if cache:
+            response = self._cache(self.params, cache_time=InstagramConfig.CACHE_TIMEDELTA)
+            if response:
+                logger.info(f'APIYoutube - {self.service} Data Cache Response Success for "{self.userName}"')
+                return response
+        logger.info(f'APIInstagram - Making Scrape for "{self.userName}"')
+        try:
+            result = self.__get()
+        except Exception as e:
+            logger.error(f'APIInstagram - Instagram Scraper no fetch for "{self.userName}"')
+            return {
+                'status': HTTPStatus.INTERNAL_SERVER_ERROR,
+                'error': "Instagram Scraper couldn't fetch data"    
+                }
+        
+        logger.info(f'APIInstagram - Instagram Data Fetch success for "{self.userName}"')           
+        response = {
+            'status': HTTPStatus.OK,
+            'cache_response': False,
+            'result': result
+        }        
+        self.save(response['result'])
+        return response
+    
+    def save(self, data: dict) -> None:
+        """Save the response to the db"""
+        self._save(params=self.params, data=data)
+    
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+        """
+        Search last response after selected date of the object
+        
+        :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return self._last_request(self.params, date_time)
+    
+    def all(self, unique = False):
+        """
+        Return a list of requests
+        
+        :param unique: gives only a set of requests by days
+        """
+        data = super()._all().filter(params=self.params)
+        if not unique:
+            return data
+        days = set([q.created_at.date() for q in data])
+        return [data.filter(created_at__date=day).first() for day in days]
+    
+    def history(self):
+        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
+        data = self.all(unique=True)
+        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
