@@ -1,7 +1,8 @@
 from django.db import models
+from asgiref.sync import sync_to_async
 import datetime
 import uuid
-from zoneinfo import ZoneInfo 
+from zoneinfo import ZoneInfo
 # Create your models here.
 class ServiceRequest(models.Model):
     """Django Model for db of the requests"""
@@ -24,6 +25,7 @@ class ServiceRequest(models.Model):
         return f"Request for {self.service} at {self.created_at.astimezone().strftime(format=r'%Y-%m-%d %H:%M:%S')}"
 
     @classmethod
+    @sync_to_async
     def _last_request(
         cls,
         service: str,
@@ -40,7 +42,7 @@ class ServiceRequest(models.Model):
         """
         return cls.objects.filter(service=service).filter(params=params).filter(created_at__lte=date_time).order_by('-created_at').first()
     
-    def last_request(
+    async def last_request(
         self,
         date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
     ):
@@ -50,4 +52,4 @@ class ServiceRequest(models.Model):
         :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return ServiceRequest._last_request(service=self.service, params=self.params, date_time=date_time)
+        return await ServiceRequest._last_request(service=self.service, params=self.params, date_time=date_time)
