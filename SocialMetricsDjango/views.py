@@ -43,7 +43,7 @@ def endpoints(request):
     ]
     return JsonResponse(endpoints, safe=False)
 
-async def api_twitter(request):
+def api_twitter(request):
     userName = request.GET.get('userName')
     history = request.GET.get('history')
     update = request.GET.get('update')
@@ -66,13 +66,13 @@ async def api_twitter(request):
     
     if update:
         logger.info('api_twitter - Forcing update')
-        response = await api.get(cache=False)
+        response = api.get(cache=False)
     else:
-        response = await api.get(cache=True)
+        response = api.get(cache=True)
     
     return JsonResponse(response, safe=False)
 
-async def api_youtube(request):
+def api_youtube(request):
     id = request.GET.get('id')
     userName = request.GET.get('userName')
     history = request.GET.get('history')
@@ -99,13 +99,13 @@ async def api_youtube(request):
     
     if update:
         logger.info('api_youtube - Forcing update')
-        response = await api.get(cache=False)
+        response = api.get(cache=False)
     else:
-        response = await api.get(cache=True)
+        response = api.get(cache=True)
     
     return JsonResponse(response, safe=False)
 
-async def api_instagram(request):
+def api_instagram(request):
     userName = request.GET.get('userName')
     history = request.GET.get('history')
     update = request.GET.get('update')
@@ -128,8 +128,8 @@ async def api_instagram(request):
     
     if update:
         logger.info('api_instagram - Forcing update')
-        response = await api.get(cache=False)
+        response = api.get(cache=False)
     else:
-        response = await api.get(cache=True)
+        response = api.get(cache=True)
     
     return JsonResponse(response, safe=False)

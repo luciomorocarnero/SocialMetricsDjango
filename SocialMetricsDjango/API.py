@@ -21,7 +21,7 @@ class APIBase:
         assert service in [ser[0] for ser in ServiceRequest.SERVICES], ValueError('No service support')
         self.service = service
     
-    async def _save(self, params: dict, data: dict):
+    def _save(self, params: dict, data: dict):
         try:
             model = ServiceRequest(service=self.service, params=params, data=data)
             model.save()
@@ -29,16 +29,16 @@ class APIBase:
         except Exception as e:
             logger.error(f'APIBase - service: {self.service} - error saving request: {e}')
 
-    async def _all(self):
+    def _all(self):
         return ServiceRequest.objects.filter(service=self.service)
     
-    async def _last_request(
+    def _last_request(
         self, params: dict, 
         date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
         ):
-        return await ServiceRequest._last_request(service=self.service,params=params,date_time=date_time)
+        return ServiceRequest._last_request(service=self.service,params=params,date_time=date_time)
     
-    async def _cache(
+    def _cache(
         self,
         params: dict, 
         cache_time: datetime.timedelta
@@ -51,7 +51,8 @@ class APIBase:
         
         :return: a response with status, cache_reponse: bool, cache_date, result
         """    
-        last_request = await self._last_request(params)
+        last_request = self._last_request(params)
+        time.sleep(2)
         if not last_request:
             logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - No last requests')
             return None
@@ -74,7 +75,7 @@ class RequestsHandler:
     def __init__(self, base_url: str):
         self.base_url = base_url
 
-    async def make_request(self, endpoint: str, params: dict = None, headers: dict = None) -> dict:
+    def make_request(self, endpoint: str, params: dict = None, headers: dict = None) -> dict:
         """
         Makes a GET request to the specified endpoint with optional query parameters and headers.
         
@@ -125,23 +126,21 @@ class APITwitter(APIBase):
             'username': self.username
         }
         
-    def __get_tweets(self) -> list:
+    def __get_tweets(self, scraper) -> list:
         try:
-            scraper = Nitter(log_level=TwitterConfig.LOG_LEVEL, skip_instance_check=TwitterConfig.SKIP_INSTANCE_CHECK)
             return scraper.get_tweets(self.username, mode='user', number=TwitterConfig.MAX_TWEETS).get('tweets', [])
         except Exception as e:
             logger.error(f'APITwitter - Error fetching tweets - userName: "{self.username}" - {e}')
             return []
         
-    def __get_profile_info(self) -> dict:
+    def __get_profile_info(self, scraper) -> dict:
         try:
-            scraper = Nitter(log_level=TwitterConfig.LOG_LEVEL, skip_instance_check=TwitterConfig.SKIP_INSTANCE_CHECK)
             return scraper.get_profile_info(self.username)
         except Exception as e:
             logger.error(f'APITwitter - Error fetching profile info userName: "{self.username}" - {e}')
             return {}
         
-    async def get(self, cache: bool = True) -> dict:
+    def get(self, cache: bool = True) -> dict:
         """
         Get profile data and tweets based on the username and store it in the database.
         
@@ -160,14 +159,15 @@ class APITwitter(APIBase):
             - 'tweets' (list): A list of dictionaries where each dictionary represents a tweet.
         """
         if cache:
-            response = await self._cache(self.params,cache_time=TwitterConfig.CACHE_TIMEDELTA)
+            response = self._cache(self.params,cache_time=TwitterConfig.CACHE_TIMEDELTA)
             if response:
                 logger.info(f'APITwitter - {self.service} Data Cache Response Success for "{self.username}"')
                 return response
         
         logger.info(f'APITwitter - Making Scrape for "{self.username}"')
-        tweets = self.__get_tweets()
-        profile = self.__get_profile_info()
+        scraper = Nitter(log_level=TwitterConfig.LOG_LEVEL, skip_instance_check=TwitterConfig.SKIP_INSTANCE_CHECK)
+        tweets = self.__get_tweets(scraper)
+        profile = self.__get_profile_info(scraper)
         if not tweets or not profile:
             logger.error(f'APITwitter - Twitter Scraper no fetch for "{self.username}"')
             return {
@@ -181,7 +181,7 @@ class APITwitter(APIBase):
             'cache_response': False,
             'result': self.__clean(profile, tweets)
         }        
-        await self.save(response['result'])
+        self.save(response['result'])
         return response
         
     def __clean(self, profile, tweets) -> dict:
@@ -223,34 +223,34 @@ class APITwitter(APIBase):
         
         return data
     
-    async def save(self, data: dict) -> None:
+    def save(self, data: dict) -> None:
         """Save the response to the db"""
-        await self._save(params=self.params, data=data)
+        self._save(params=self.params, data=data)
         
-    async def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
         """
         Search last response after selected date of the object
         
         :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return await self._last_request(self.params, date_time)
+        return self._last_request(self.params, date_time)
     
-    async def all(self, unique = False):
+    def all(self, unique = False):
         """
         Return a list of requests
         
         :param unique: gives only a set of requests by days
         """
-        data = await super()._all().filter(params=self.params)
+        data = super()._all().filter(params=self.params)
         if not unique:
             return data
         days = set([q.created_at.date() for q in data])
         return [data.filter(created_at__date=day).first() for day in days]
     
-    async def history(self):
+    def history(self):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = await self.all(unique=True)
+        data = self.all(unique=True)
         return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
     
 class APIYoutube(APIBase):
@@ -269,7 +269,7 @@ class APIYoutube(APIBase):
         }
         
     @classmethod
-    async def by_userName(cls, userName: str, api_key: str):
+    def by_userName(cls, userName: str, api_key: str):
         """
         Retrieves the YouTube API object based on a given username.
 
@@ -300,7 +300,7 @@ class APIYoutube(APIBase):
             'part': 'id',
             'key': api_key
         }
-        response = await RequestsHandler(APIYoutube.base_url).make_request('/channels', params=params)
+        response = RequestsHandler(APIYoutube.base_url).make_request('/channels', params=params)
         
         if not response:
             return None
@@ -315,13 +315,13 @@ class APIYoutube(APIBase):
         
         return cls(id=youtube_id, api_key=api_key)
     
-    async def __get_profile(self):
+    def __get_profile(self):
         params = {
             'part': 'statistics,status,snippet',
             'id': self.id,
             'key': self.api_key
         }
-        response = await RequestsHandler(self.base_url).make_request('/channels',params=params)
+        response = RequestsHandler(self.base_url).make_request('/channels',params=params)
         if not response:
             logger.error(f'APIYoutube - error fetching __get_profile for id: "{self.id}"')
             return None
@@ -330,7 +330,7 @@ class APIYoutube(APIBase):
             return None
         return response
     
-    async def __get_videos(self):
+    def __get_videos(self):
         params = {
             'channelId': self.id,
             'maxResults': YoutubeConfig.MAX_RESULTS,
@@ -338,7 +338,7 @@ class APIYoutube(APIBase):
             'type': 'video',
             'key': self.api_key
         }
-        response = await RequestsHandler(self.base_url).make_request('/search', params=params)
+        response = RequestsHandler(self.base_url).make_request('/search', params=params)
         if not response:
             logger.error(f'APIYoutube - error fetching "__get_videos /search" for id "{self.id}"')
             return None
@@ -353,22 +353,22 @@ class APIYoutube(APIBase):
             'id': videos,
             'key': self.api_key or YoutubeConfig.KEY
         }
-        response = await RequestsHandler(self.base_url).make_request('/videos', params)
+        response = RequestsHandler(self.base_url).make_request('/videos', params)
         if not response:
             logger.error(f'APIYoutube - error no items in "__get_videos /videos" response for id "{self.id}" videos_str: "videos"')
             return None
         return response
     
-    async def get(self, cache: bool = True):
+    def get(self, cache: bool = True):
         if cache:
-            response = await self._cache(self.params, cache_time=YoutubeConfig.CACHE_TIMEDELTA)
+            response = self._cache(self.params, cache_time=YoutubeConfig.CACHE_TIMEDELTA)
             if response:
                 logger.info(f'APIYoutube - {self.service} Data Cache Response Success for "{self.id}"')
                 return response
         
         logger.info(f'APIYoutube - Making API request for id: "{self.id}"')    
-        profile = await self.__get_profile()
-        videos = await self.__get_videos()
+        profile = self.__get_profile()
+        videos = self.__get_videos()
         if not videos or not profile:
             logger.error(f'APIYoutube - error in get request for {self.id}')
             return {
@@ -382,7 +382,7 @@ class APIYoutube(APIBase):
             'cache_response': False,
             'result': self.__clean(profile,videos) or {'profile': profile, "videos":videos, 'cleaned': False}
         }
-        await self.save(response['result'])
+        self.save(response['result'])
         return response
 
     def __clean(self,profile, videos) -> dict:
@@ -431,34 +431,34 @@ class APIYoutube(APIBase):
         
         return data
 
-    async def save(self, data: dict) -> None:
+    def save(self, data: dict) -> None:
         """Save the response to the db"""
-        await self._save(params=self.params, data=data)
+        self._save(params=self.params, data=data)
 
-    async def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
         """
         Search last response after selected date of the object
         
         :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return await self._last_request(self.params, date_time)
+        return self._last_request(self.params, date_time)
     
-    async def all(self, unique = False):
+    def all(self, unique = False):
         """
         Return a list of requests
         
         :param unique: gives only a set of requests by days
         """
-        data = await super()._all().filter(params=self.params)
+        data = super()._all().filter(params=self.params)
         if not unique:
             return data
         days = set([q.created_at.date() for q in data])
         return [data.filter(created_at__date=day).first() for day in days]
     
-    async def history(self):
+    def history(self):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = await self.all(unique=True)
+        data = self.all(unique=True)
         return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
 
 class APIIntagram(APIBase):
@@ -469,7 +469,7 @@ class APIIntagram(APIBase):
             "username": self.userName
         }
 
-    async def __get(self):
+    def __get(self):
         loader = instaloader.Instaloader()
         profile = instaloader.Profile.from_username(loader.context,self.userName)
         d = {
@@ -520,15 +520,15 @@ class APIIntagram(APIBase):
             
             return d
         
-    async def get(self, cache: bool = True):
+    def get(self, cache: bool = True):
         if cache:
-            response = await self._cache(self.params, cache_time=InstagramConfig.CACHE_TIMEDELTA)
+            response = self._cache(self.params, cache_time=InstagramConfig.CACHE_TIMEDELTA)
             if response:
                 logger.info(f'APIYoutube - {self.service} Data Cache Response Success for "{self.userName}"')
                 return response
         logger.info(f'APIInstagram - Making Scrape for "{self.userName}"')
         try:
-            result = await self.__get()
+            result = self.__get()
         except Exception as e:
             logger.error(f'APIInstagram - Instagram Scraper no fetch for "{self.userName}"')
             return {
@@ -542,35 +542,35 @@ class APIIntagram(APIBase):
             'cache_response': False,
             'result': result
         }        
-        await self.save(response['result'])
+        self.save(response['result'])
         return response
     
-    async def save(self, data: dict) -> None:
+    def save(self, data: dict) -> None:
         """Save the response to the db"""
-        await self._save(params=self.params, data=data)
-
-    async def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+        self._save(params=self.params, data=data)
+    
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
         """
         Search last response after selected date of the object
         
         :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return await self._last_request(self.params, date_time)
+        return self._last_request(self.params, date_time)
     
-    async def all(self, unique = False):
+    def all(self, unique = False):
         """
         Return a list of requests
         
         :param unique: gives only a set of requests by days
         """
-        data = await super()._all().filter(params=self.params)
+        data = super()._all().filter(params=self.params)
         if not unique:
             return data
         days = set([q.created_at.date() for q in data])
         return [data.filter(created_at__date=day).first() for day in days]
     
-    async def history(self):
+    def history(self):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = await self.all(unique=True)
+        data = self.all(unique=True)
         return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
