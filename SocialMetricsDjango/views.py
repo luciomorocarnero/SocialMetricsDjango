@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 # Create your views here.
 def test(request):
     response = {}
+    api = APIIntagram('joerogan')
+    response = api.get()
     return JsonResponse(response, safe=False)
 
 # TODO: Complete Enpoints

@@ -8,7 +8,8 @@ import dateparser
 from dataclasses import dataclass
 
 from ntscraper import Nitter #Scrapper For twitter
-import requests
+import requests # For requests to Youtube API V3
+import instaloader # Scrapper For Instagram
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ class APITwitter(APIBase):
                 'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else '',
                 'video': tweet.get('videos', [TwitterConfig.DEFAULT_VIDEO]),
                 'statistics': stats,
-                'datetime': dateparser.parse(tweet.get('date', '26/06/2003 15:00')).isoformat()
+                'publishedAt': dateparser.parse(tweet.get('date', '26/06/2003 15:00')).isoformat()
             }
             data['tweets'].append(d)
 
@@ -457,3 +458,64 @@ class APIYoutube(APIBase):
         """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
         data = self.all(unique=True)
         return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+
+class APIIntagram(APIBase):
+    def __init__(self, userName):
+        super().__init__("Instagram")
+        self.userName = userName
+        self.params = {
+            "id": self.userName
+        }
+
+    def __get(self):
+        loader = instaloader.Instaloader()
+        profile = instaloader.Profile.from_username(loader.context,self.userName)
+        d = {
+            'profile': {
+                'username': profile.username,
+                'image': profile.profile_pic_url,
+                'id': profile.userid,
+                ''
+                'stats': {
+                    'following': profile.followees,
+                    'followers': profile.followers,
+                    'media': profile.mediacount,
+                    }
+                },
+            'post': []
+        }
+        posts = profile.get_posts()
+        i = 0
+        for post in posts:
+            i += 1
+            if i > InstagramConfig.MAX_RESULTS:
+                break
+            
+            info = post._node
+            
+            candidates = info.get('iphone_struct',{}).get('image_versions2', {}).get('candidates', [])
+            if candidates:
+                filtered_candidates = list(filter(lambda item: item['width'] == 640 and item['height'] == 640, candidates))
+                image = filtered_candidates[0]['url'] if filtered_candidates else candidates[0]['url']
+            else:
+                image = InstagramConfig.DEFAULT_IMG
+            p = {
+                'id': info.get('id'),
+                'publishedAt': info.get('date'),
+                'image': image,
+                'title': info.get('title'),
+                'caption': info.get('caption'),
+                'video': {
+                    'is_video': post.is_video,
+                    'url': post.video_url or InstagramConfig.DEFAULT_VIDEO,
+                    'views': post.video_view_count
+                },
+                'stats': {
+                    'likes': info.get('edge_media_preview_like', {}).get('count'),
+                    'comments': info.get('comments'),
+                }
+            }
+            d['post'].append(p)
+            
+            return d
+        
