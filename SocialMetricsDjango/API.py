@@ -6,6 +6,7 @@ import datetime
 from http import HTTPStatus
 import dateparser
 from dataclasses import dataclass
+import time
 
 from ntscraper import Nitter #Scrapper For twitter
 import requests # For requests to Youtube API V3
@@ -46,11 +47,12 @@ class APIBase:
         Search last request till the cache_time
         
         :param params: params for searching requests
-        :param cache_time: timedelta object for search requests, can cahce in TwitterConfig in SocialMetricsDjango/setting.py
+        :param cache_time: timedelta object for search requests, can cache in ServiceConfig in SocialMetricsDjango/setting.py
         
         :return: a response with status, cache_reponse: bool, cache_date, result
         """    
         last_request = self._last_request(params)
+        time.sleep(2)
         if not last_request:
             logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - No last requests')
             return None
