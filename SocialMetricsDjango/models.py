@@ -25,7 +25,6 @@ class ServiceRequest(models.Model):
         return f"Request for {self.service} at {self.created_at.astimezone().strftime(format=r'%Y-%m-%d %H:%M:%S')}"
 
     @classmethod
-    @sync_to_async
     def _last_request(
         cls,
         service: str,
@@ -52,4 +51,4 @@ class ServiceRequest(models.Model):
         :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return await ServiceRequest._last_request(service=self.service, params=self.params, date_time=date_time)
+        return ServiceRequest._last_request(service=self.service, params=self.params, date_time=date_time)
