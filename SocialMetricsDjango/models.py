@@ -40,7 +40,7 @@ class ServiceRequest(models.Model):
         """
         return cls.objects.filter(service=service).filter(params=params).filter(created_at__lte=date_time).order_by('-created_at').first()
     
-    async def last_request(
+    def last_request(
         self,
         date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
     ):
