@@ -10,9 +10,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def test(request):
-    response = {}
-    api = APITiktok('@info_jst')
-    response = api.get()
+    response = {
+        'status': HTTPStatus.OK,
+        'message': 'this is a test view, the server is running'
+    }
+
     return JsonResponse(response, safe=False)
 
 # TODO: Complete Enpoints
@@ -38,11 +40,19 @@ def endpoints(request):
         {
             'url': 'api/instagram',
             'params': {
-                'userName': "Return id of userName if this is found",
-                'history': "return youtube profile history stats, unique for each day",
+                'userName': "search param for instagram",
+                'history': "return instagram profile history stats, unique for each day",
                 'update': "force scrape and bypass cache"
             }
-        }
+        },
+                {
+            'url': 'api/tiktok',
+            'params': {
+                'userName': "search params, must have '@'",
+                'history': "return tiktok profile history stats, unique for each day",
+                'update': "force scrape and bypass cache"
+            }
+        },
     ]
     return JsonResponse(endpoints, safe=False)
 
@@ -120,6 +130,36 @@ def api_instagram(request):
         return JsonResponse(response, safe=False)
     
     api = APIIntagram(userName)
+    
+    if history:
+        response = {
+            'status': HTTPStatus.OK,
+            'user': api.userName,
+            'result': api.history()
+        }
+        return JsonResponse(response, safe=False)
+    
+    if update:
+        logger.info('api_instagram - Forcing update')
+        response = api.get(cache=False)
+    else:
+        response = api.get(cache=True)
+    
+    return JsonResponse(response, safe=False)
+
+
+def api_tiktok(request):
+    userName = request.GET.get('userName')
+    history = request.GET.get('history')
+    update = request.GET.get('update')
+    if not userName:
+        response =  {
+            'status': HTTPStatus.BAD_REQUEST,
+            'error': 'Must provide a userName'
+        }
+        return JsonResponse(response, safe=False)
+    
+    api = APITiktok(userName)
     
     if history:
         response = {

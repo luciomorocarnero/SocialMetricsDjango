@@ -616,8 +616,8 @@ class APITiktok(APIBase):
         page = context.new_page()
         
         page.on('response', self.__handle_response)
-        
-        page.goto('https://www.tiktok.com/@info_jst/')
+        assert self.userName.startswith('@') and not ' ' in self.userName, 'userName must have @'
+        page.goto(f'https://www.tiktok.com/{self.userName}/')
         
         page.wait_for_timeout(2000)
         try:
