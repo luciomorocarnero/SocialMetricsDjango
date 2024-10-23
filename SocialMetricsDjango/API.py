@@ -506,7 +506,7 @@ class APIIntagram(APIBase):
                 image = InstagramConfig.DEFAULT_IMG
             p = {
                 'id': info.get('id'),
-                'publishedAt': datetime.datetime.fromtimestamp(f"{info.get('date', 1715630227)}").isoformat(),
+                'publishedAt': datetime.datetime.fromtimestamp(info.get('date', 1715630227)).isoformat(),
                 'image': image,
                 'title': info.get('title'),
                 'caption': info.get('caption'),
@@ -534,12 +534,12 @@ class APIIntagram(APIBase):
         try:
             result = self.__get()
         except Exception as e:
-            logger.error(f'APIInstagram - Instagram Scraper no fetch for "{self.userName}"')
+            logger.error(f'APIInstagram - Instagram Scraper no fetch for "{self.userName}": {e}')
             return {
                 'status': HTTPStatus.INTERNAL_SERVER_ERROR,
                 'error': "Instagram Scraper couldn't fetch data"    
                 }
-        
+            
         logger.info(f'APIInstagram - Instagram Data Fetch success for "{self.userName}"')           
         response = {
             'status': HTTPStatus.OK,
@@ -650,6 +650,7 @@ class APITiktok(APIBase):
         logger.info(f'APITiktok - Making Scrape for "{self.userName}"')
         try:
             self.__get()
+            results = self.__cleaned_data()
         except Exception as e:
             logger.error(f'APITiktok - Tiktok Scraper no fetch for "{self.userName}": {e}')
             return {
@@ -662,7 +663,7 @@ class APITiktok(APIBase):
         response = {
             'status': HTTPStatus.OK,
             'cache_response': False,
-            'result': self.__cleaned_data()
+            'result':results
         }        
         self.save(response['result'])
         return response
@@ -676,6 +677,8 @@ class APITiktok(APIBase):
         }
         
         tiktoks = self.scrape_response.get("itemList")
+        if not tiktoks:
+            raise ValueError('No tiktoks fetched')
         
         authors = [post.get('author', {}).get('id')
             for post in tiktoks
@@ -729,7 +732,7 @@ class APITiktok(APIBase):
             more_statistics['AvgShares'] += stats.get('shareCount')
             more_statistics['AvgSaves'] += stats.get('collectCount')
             more_statistics['AvgComments'] += stats.get('commentCount')
-            
+        
         total_tiktoks = len(tiktoks)
         if total_tiktoks > 0:
             more_statistics = {key: round(value / total_tiktoks) for key, value in more_statistics.items()}

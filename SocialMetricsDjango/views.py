@@ -170,7 +170,7 @@ def api_tiktok(request):
         return JsonResponse(response, safe=False)
     
     if update:
-        logger.info('api_instagram - Forcing update')
+        logger.info('api_tiktok - Forcing update')
         response = api.get(cache=False)
     else:
         response = api.get(cache=True)
