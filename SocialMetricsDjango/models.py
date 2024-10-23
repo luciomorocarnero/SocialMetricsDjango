@@ -10,7 +10,8 @@ class ServiceRequest(models.Model):
         ('Twitter', 'Twitter'),
         ('Youtube','Youtube'),
         ('Instagram', 'Instagram'),
-        ('Facebook', 'Facebook')
+        ('Facebook', 'Facebook'),
+        ('Tiktok', 'Tiktok')
     )
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 def test(request):
     response = {}
+    api = APITiktok('@info_jst')
+    response = api.get()
     return JsonResponse(response, safe=False)
 
 # TODO: Complete Enpoints
@@ -27,7 +29,8 @@ def endpoints(request):
         {
             'url': 'api/youtube',
             'params': {
-                'userName': "Return id of userName if this is found",
+                'userName': "Requests by youtube profile username",
+                'id': "Request by youtube profile id",
                 'history': "return youtube profile history stats, unique for each day",
                 'update': "force scrape and bypass cache"
             }

@@ -7,10 +7,14 @@ from http import HTTPStatus
 import dateparser
 from dataclasses import dataclass
 import time
+import json
+from collections import Counter
+
 
 from ntscraper import Nitter #Scrapper For twitter
 import requests # For requests to Youtube API V3
 import instaloader # Scrapper For Instagram
+from playwright.sync_api import sync_playwright, Playwright
 
 logger = logging.getLogger(__name__)
 
@@ -502,7 +506,7 @@ class APIIntagram(APIBase):
                 image = InstagramConfig.DEFAULT_IMG
             p = {
                 'id': info.get('id'),
-                'publishedAt': datetime.datetime.fromtimestamp(info.get('date')).isoformat(),
+                'publishedAt': datetime.datetime.fromtimestamp(f"{info.get('date', 1715630227)}").isoformat(),
                 'image': image,
                 'title': info.get('title'),
                 'caption': info.get('caption'),
@@ -545,6 +549,197 @@ class APIIntagram(APIBase):
         self.save(response['result'])
         return response
     
+    def save(self, data: dict) -> None:
+        """Save the response to the db"""
+        self._save(params=self.params, data=data)
+    
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+        """
+        Search last response after selected date of the object
+        
+        :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return self._last_request(self.params, date_time)
+    
+    def all(self, unique = False):
+        """
+        Return a list of requests
+        
+        :param unique: gives only a set of requests by days
+        """
+        data = super()._all().filter(params=self.params)
+        if not unique:
+            return data
+        days = set([q.created_at.date() for q in data])
+        return [data.filter(created_at__date=day).first() for day in days]
+    
+    def history(self):
+        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
+        data = self.all(unique=True)
+        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+
+class APITiktok(APIBase):
+    
+    def __init__(self, userName: str):
+        super().__init__("Tiktok")
+        self.userName = userName
+        self.params = {
+            "username": self.userName
+        }
+        
+        self.scrape_response = None
+        self.scrape_followers = None
+        
+    def __handle_response(self, response):
+        if '/api/post' in response.url:
+
+            try:
+                response_body = response.body().decode('utf-8')
+                self.scrape_response = json.loads(response_body)
+            except json.JSONDecodeError as e:
+                logger.error(f'APITiktok - JSON decoding error for "{self.userName}": {e}')
+                self.scrape_response = None
+            except Exception as e:
+                logger.error(f'APITiktok - Error scraping for "{self.userName}": {e}')
+                self.scrape_response = None
+    
+    def __run(self, playwright: Playwright):
+        iphone_13 = playwright.devices['iPhone 13']
+        browser = playwright.webkit.launch(headless=True)
+        iphone_13.pop('viewport', None)
+
+        context = browser.new_context(
+            **iphone_13,
+        )
+
+        page = context.new_page()
+        
+        page.on('response', self.__handle_response)
+        
+        page.goto('https://www.tiktok.com/@info_jst/')
+        
+        page.wait_for_timeout(2000)
+        try:
+            self.scrape_followers = page.locator('[data-e2e="followers-count"]').inner_text()
+        except Exception as e:
+            logger.error(f'APITiktok - Error locating followers for "{self.userName}": {e}')
+            self.scrape_followers = None
+        page.wait_for_timeout(500)
+        
+        # Cierra el navegador
+        browser.close()
+    
+    def __get(self):
+        with sync_playwright() as playwright:
+            self.__run(playwright)
+        
+        if not self.scrape_followers or not self.scrape_response:
+            logger.error(f"APITiktok - Couldn't scrape for {self.userName}")
+            raise ValueError('tiktok scraping __get')
+        
+        
+        return self.scrape_response, self.scrape_followers
+    
+    def get(self, cache: bool = True):
+        if cache:
+            response = self._cache(self.params, cache_time=TiktokConfig.CACHE_TIMEDELTA)
+            if response:
+                logger.info(f'APITiktok - {self.service} Data Cache Response Success for "{self.userName}"')
+                return response
+        logger.info(f'APITiktok - Making Scrape for "{self.userName}"')
+        try:
+            self.__get()
+        except Exception as e:
+            logger.error(f'APITiktok - Tiktok Scraper no fetch for "{self.userName}": {e}')
+            return {
+                'status': HTTPStatus.INTERNAL_SERVER_ERROR,
+                'error': "Tiktok Scraper couldn't fetch data"    
+                }
+        
+        logger.info(f'APITiktok - Tiktok Data Fetch success for "{self.userName}"')
+        
+        response = {
+            'status': HTTPStatus.OK,
+            'cache_response': False,
+            'result': self.__cleaned_data()
+        }        
+        self.save(response['result'])
+        return response
+
+    def __cleaned_data(self):
+        """Clear fetched data and add statistics """
+        logger.debug(f'APITiktok - Cleaning Data for "{self.userName}"')
+        data = {
+            'profile': {},
+            'tiktoks': []
+        }
+        
+        tiktoks = self.scrape_response.get("itemList")
+        
+        authors = [post.get('author', {}).get('id')
+            for post in tiktoks
+            if post.get('author', {}).get('id')]
+    
+        author_mostcommon = Counter(authors).most_common(1)
+
+        if not author_mostcommon:
+            logger.error(f'APITiktok - No authors found for "{self.userName}"')
+            raise ValueError('No matching author found')
+
+        author_id = author_mostcommon[0][0]  # Get the actual author ID
+        author = [tiktok.get('author') for tiktok in tiktoks if tiktok.get('author', {}).get('id', '') == author_id]
+
+        if not author:  # Ensure author list is not empty
+            logger.error(f'APITiktok - No matching author object found for ID: {author_id}')
+            raise ValueError('No matching author object found')
+
+        author = author[0]
+
+        data['profile'] = {
+            'id': author.get('id'),
+            'img': author.get('avatarMedium'),
+            'username': author.get('uniqueId'),
+            'name': author.get('nickname'),
+            'stats': {
+                'followers': self.scrape_followers
+            }
+        }
+        
+        
+        more_statistics = {'avgViews':0, 'AvgLikes':0,'AvgShares':0, 'AvgSaves':0, 'AvgComments': 0}
+        for post in tiktoks:
+            stats = post.get('stats', {})
+            d = {
+                'id': post.get('id'),
+                'publishedAt': datetime.datetime.fromtimestamp(post.get('date', 1715630227)).isoformat(),
+                'caption': post.get('desc'),
+                'img': post.get('video', {}).get('cover'),
+                'stats': {
+                    'views': stats.get('playCount'),
+                    'likes': stats.get('diggCount'),
+                    'shares': stats.get('shareCount'),
+                    'saves': stats.get('collectCount'),
+                    'comments': stats.get('commentCount')
+                    },
+            }
+            data['tiktoks'].append(d)
+            more_statistics['avgViews'] += stats.get('playCount')
+            more_statistics['AvgLikes'] += stats.get('diggCount')
+            more_statistics['AvgShares'] += stats.get('shareCount')
+            more_statistics['AvgSaves'] += stats.get('collectCount')
+            more_statistics['AvgComments'] += stats.get('commentCount')
+            
+        total_tiktoks = len(tiktoks)
+        if total_tiktoks > 0:
+            more_statistics = {key: round(value / total_tiktoks) for key, value in more_statistics.items()}
+        else:
+            more_statistics = {key: 0 for key, value in more_statistics.items()}
+        
+        data['profile']['stats'].update(more_statistics)
+        
+        return data
+
     def save(self, data: dict) -> None:
         """Save the response to the db"""
         self._save(params=self.params, data=data)

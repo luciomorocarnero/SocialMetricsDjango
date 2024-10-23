@@ -30,3 +30,10 @@ class InstagramConfig:
     MAX_TRIES: int = 3
     MAX_RESULTS: int = 20
     CACHE_TIMEDELTA: datetime.timedelta = datetime.timedelta(days=7)
+
+class TiktokConfig:
+    DEFAULT_IMG: str = r'https://nzbirdsonline.org.nz/sites/all/files/2X2A1697%20King%20Penguin%20bol.jpg'
+    DEFAULT_VIDEO: str = r'No video found'
+    MAX_TRIES: int = 3
+    MAX_RESULTS: int = 20
+    CACHE_TIMEDELTA: datetime.timedelta = datetime.timedelta(days=7)
