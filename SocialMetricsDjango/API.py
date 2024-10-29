@@ -54,18 +54,13 @@ class APIBase:
         :param cache_time: timedelta object for search requests, can cache in ServiceConfig in SocialMetricsDjango/setting.py
         
         :return: a response with status, cache_reponse: bool, cache_date, result
-        """    
-        last_request = self._last_request(params)
-        time.sleep(2)
-        if not last_request:
-            logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - No last requests')
-            return None
-        
+        """
         date = datetime.datetime.now(datetime.timezone.utc) - cache_time
-        if last_request.created_at < date:
-            logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - last_request.created_at < cache_date')
+        last_request = self._last_request(params, date_time=date)
+        if not last_request:
+            logger.debug(f'APIBase - service: {self.service} - "{params}" - Cache - No last requests for date: {date.date().isoformat()} - cacheConfig: {cache_time.days}')
             return None
-        
+         
         response = {
             'status': HTTPStatus.OK,
             'cache_response': True,
@@ -522,13 +517,13 @@ class APIIntagram(APIBase):
             }
             d['post'].append(p)
             
-            return d
+        return d    
         
     def get(self, cache: bool = True):
         if cache:
             response = self._cache(self.params, cache_time=InstagramConfig.CACHE_TIMEDELTA)
             if response:
-                logger.info(f'APIYoutube - {self.service} Data Cache Response Success for "{self.userName}"')
+                logger.info(f'APIInstagram - {self.service} Data Cache Response Success for "{self.userName}" - cache_date {response.get('cache_date', '...')}')
                 return response
         logger.info(f'APIInstagram - Making Scrape for "{self.userName}"')
         try:

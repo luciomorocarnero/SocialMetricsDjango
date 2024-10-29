@@ -1,7 +1,8 @@
-from django.db import models
+from django.db import models, transaction
 import datetime
 import uuid
 from zoneinfo import ZoneInfo
+
 # Create your models here.
 class ServiceRequest(models.Model):
     """Django Model for db of the requests"""
@@ -39,7 +40,13 @@ class ServiceRequest(models.Model):
         :param datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
         :return: None if not match and object if it's found
         """
-        return cls.objects.filter(service=service).filter(params=params).filter(created_at__lte=date_time).order_by('-created_at').first()
+        queryset = cls.objects.all().order_by('-created_at')
+        for query in queryset:
+            if query.service == service and query.params == params and query.created_at > date_time:
+                return query
+            if query.created_at.date() < date_time.date():
+                break 
+        return None
     
     def last_request(
         self,
