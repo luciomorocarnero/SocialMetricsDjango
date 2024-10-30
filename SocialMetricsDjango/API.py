@@ -764,6 +764,34 @@ class APITiktok(APIBase):
         return [data.filter(created_at__date=day).first() for day in days]
     
     def history(self):
-        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = self.all(unique=True)
-        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+        service_requests = self.all(unique=True)
+        
+        ids = set([post.get('id') for service_request in service_requests for post in service_request.data.get('tiktoks', [])])
+        post_story= []
+        for id in ids:
+            d = {
+                'id': id,
+                'stats': {}
+            }
+            for service_request in service_requests:
+                posts = service_request.data.get('tiktoks', [])
+                for post in posts:
+                    if id == post.get('id'):
+                        stats: dict = post.get('stats', {})
+                        for key, value in stats.items():
+                            if d['stats'].get(key):
+                                d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                            else:
+                                d['stats'][key] = [{'value': value, 'date':service_request.created_at.date().isoformat()}]
+            post_story.append(d)
+        
+        profile_story = {'stats': {}}
+        for service_request in service_requests:
+            stats: dict = service_request.data.get('profile', {}).get('stats', {})
+            for key, value in stats.items():
+                if profile_story['stats'].get(key):
+                    profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                else:
+                    profile_story['stats'][key] = [{'value': value, 'date':service_request.created_at.date().isoformat()}]
+                        
+        return {'profile': profile_story, 'tiktoks': post_story}
