@@ -201,7 +201,7 @@ class APITwitter(APIBase):
                 'text': tweet.get('text', ''),
                 'picture': tweet.get('pictures', [TwitterConfig.DEFAULT_IMG])[0] if tweet.get('pictures') else '',
                 'video': tweet.get('videos', [TwitterConfig.DEFAULT_VIDEO]),
-                'statistics': stats,
+                'stats': stats,
                 'publishedAt': dateparser.parse(tweet.get('date', '26/06/2003 15:00')).isoformat()
             }
             data['tweets'].append(d)
@@ -248,9 +248,35 @@ class APITwitter(APIBase):
         return [data.filter(created_at__date=day).first() for day in days]
     
     def history(self):
-        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = self.all(unique=True)
-        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+        service_requests = self.all(unique=True)
+        
+        ids = set([str(post.get('url')).split('/')[-1] for service_request in service_requests for post in service_request.data.get('tweets', [])])
+        post_story= []
+        for id in ids:
+            d = {
+                'id': id,
+                'stats': {}
+            }
+            for service_request in service_requests:
+                posts = service_request.data.get('tweets', [])
+                for post in posts:
+                    if id == post.get('id'):
+                        stats: dict = post.get('stats', {})
+                        for key, value in stats.items():
+                            if not key in d['stats']:
+                                d['stats'][key] = []
+                            d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+            post_story.append(d)
+        
+        profile_story = {'stats': {}}
+        for service_request in service_requests:
+            stats: dict = service_request.data.get('profile', {}).get('stats', {})
+            for key, value in stats.items():
+                if not key in profile_story['stats']:
+                    profile_story['stats'][key] = []
+                profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                        
+        return {'profile': profile_story, 'tweets': post_story}
     
 class APIYoutube(APIBase):
     
@@ -414,7 +440,7 @@ class APIYoutube(APIBase):
                 'title': snippet.get('title'),
                 'publishedAt': snippet.get('publishedAt'),
                 'image': snippet.get('thumbnails', {}).get('standard', {}).get('url', YoutubeConfig.DEFAULT_IMG), # 640 x 480
-                'statistics': dict(zip(stats.keys(), map(lambda x: int(x) if x.isdigit() else 0, stats.values()))),
+                'stats': dict(zip(stats.keys(), map(lambda x: int(x) if x.isdigit() else 0, stats.values()))),
             })
             more_statistics['avgViews'] += int(stats.get('viewCount', 0))   
             more_statistics['avgLikes'] += int(stats.get('likeCount', 0))   
@@ -456,9 +482,35 @@ class APIYoutube(APIBase):
         return [data.filter(created_at__date=day).first() for day in days]
     
     def history(self):
-        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = self.all(unique=True)
-        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+        service_requests = self.all(unique=True)
+        
+        ids = set([post.get('id') for service_request in service_requests for post in service_request.data.get('videos', [])])
+        post_story= []
+        for id in ids:
+            d = {
+                'id': id,
+                'stats': {}
+            }
+            for service_request in service_requests:
+                posts = service_request.data.get('videos', [])
+                for post in posts:
+                    if id == post.get('id'):
+                        stats: dict = post.get('stats', {})
+                        for key, value in stats.items():
+                            if not key in d['stats']:
+                                d['stats'][key] = []
+                            d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+            post_story.append(d)
+        
+        profile_story = {'stats': {}}
+        for service_request in service_requests:
+            stats: dict = service_request.data.get('profile', {}).get('stats', {})
+            for key, value in stats.items():
+                if not key in profile_story['stats']:
+                    profile_story['stats'][key] = []
+                profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                        
+        return {'profile': profile_story, 'videos': post_story}
 
 class APIIntagram(APIBase):
     def __init__(self, userName):
@@ -482,7 +534,7 @@ class APIIntagram(APIBase):
                     'media': profile.mediacount,
                     }
                 },
-            'post': []
+            'posts': []
         }
         posts = profile.get_posts()
         i = 0
@@ -515,7 +567,7 @@ class APIIntagram(APIBase):
                     'comments': info.get('comments'),
                 }
             }
-            d['post'].append(p)
+            d['posts'].append(p)
             
         return d    
         
@@ -570,9 +622,35 @@ class APIIntagram(APIBase):
         return [data.filter(created_at__date=day).first() for day in days]
     
     def history(self):
-        """Return a list of requests data for Twitter Profile like ...{date, data{'profile'}}"""
-        data = self.all(unique=True)
-        return [{'date':x.created_at.date().isoformat(), 'stats':x.data.get('profile', {}).get('stats')} for x in data]
+        service_requests = self.all(unique=True)
+        
+        ids = set([post.get('id') for service_request in service_requests for post in service_request.data.get('posts', [])])
+        post_story= []
+        for id in ids:
+            d = {
+                'id': id,
+                'stats': {}
+            }
+            for service_request in service_requests:
+                posts = service_request.data.get('posts', [])
+                for post in posts:
+                    if id == post.get('id'):
+                        stats: dict = post.get('stats', {})
+                        for key, value in stats.items():
+                            if not key in d['stats']:
+                                d['stats'][key] = []
+                            d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+            post_story.append(d)
+        
+        profile_story = {'stats': {}}
+        for service_request in service_requests:
+            stats: dict = service_request.data.get('profile', {}).get('stats', {})
+            for key, value in stats.items():
+                if not key in profile_story['stats']:
+                    profile_story['stats'][key] = []
+                profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                        
+        return {'profile': profile_story, 'posts': post_story}
 
 class APITiktok(APIBase):
     
@@ -779,19 +857,17 @@ class APITiktok(APIBase):
                     if id == post.get('id'):
                         stats: dict = post.get('stats', {})
                         for key, value in stats.items():
-                            if d['stats'].get(key):
-                                d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                            else:
-                                d['stats'][key] = [{'value': value, 'date':service_request.created_at.date().isoformat()}]
+                            if not key in d['stats']:
+                                d['stats'][key] = []
+                            d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
             post_story.append(d)
         
         profile_story = {'stats': {}}
         for service_request in service_requests:
             stats: dict = service_request.data.get('profile', {}).get('stats', {})
             for key, value in stats.items():
-                if profile_story['stats'].get(key):
-                    profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                else:
-                    profile_story['stats'][key] = [{'value': value, 'date':service_request.created_at.date().isoformat()}]
+                if not key in profile_story['stats']:
+                    profile_story['stats'][key] = []
+                profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
                         
         return {'profile': profile_story, 'tiktoks': post_story}
