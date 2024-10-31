@@ -176,3 +176,16 @@ def api_tiktok(request):
         response = api.get(cache=True)
     
     return JsonResponse(response, safe=False)
+
+
+def youtube(request):
+    return render(request, 'base.html', {'active': 'youtube'})
+
+def tiktok(request):
+    return render(request, 'base.html', {'active': 'tiktok'})
+
+def instagram(request):
+    return render(request, 'base.html', {'active': 'instagram'})
+
+def twitter(request):
+    return render(request, 'base.html', {'active': 'twitter'})
