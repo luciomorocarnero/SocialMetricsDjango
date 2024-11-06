@@ -179,7 +179,7 @@ def api_tiktok(request):
 
 
 def youtube(request):
-    return render(request, 'base.html', {'active': 'youtube'})
+    return render(request, 'SocialMetricsDjango/youtube.html', {'active': 'youtube'})
 
 def tiktok(request):
     return render(request, 'base.html', {'active': 'tiktok'})
