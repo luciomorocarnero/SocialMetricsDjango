@@ -427,14 +427,77 @@ class APITwitter(APIBase):
     # Cleaners
     def __play_clean(self, data: dict | None = None) -> dict:
         if not data:
-            return None
-        
+            return {}
+
         instructions = data.get('data', {}).get('user', {}).get('result', {}).get('timeline_v2', {}).get('timeline', {}).get('instructions', [])
+        authors = []
+        response = {
+            'profile': {},
+            'tweets': []
+        }
+        
         for inst in instructions:
             for entrie in inst.get('entries', []):
-                content = entrie.get('Iter')
+                content = entrie.get('content', {}).get('itemContent', {}).get('tweet_results', {}).get('result', {})
+                legacy = content.get('legacy', {})
+                if not content or not legacy:
+                    continue
+                try:
+                    date = datetime.datetime.strptime(legacy.get('created_at'), r"%a %b %d %H:%M:%S %z %Y").isoformat()
+                except Exception as e:
+                    continue
+                d = {
+                    'id': legacy.get('id_str'),
+                    '__typename': content.get('__typename'),
+                    'retweeted': legacy.get('retweeted'),
+                    'user': content.get('core', {}).get('user_results', {}).get('result', {}).get('legacy', {}).get('screen_name'),
+                    'url':f"https://x.com/anyuser/status/{legacy.get('id_str')}",
+                    'text': legacy.get('full_text'),
+                    # 'publishedAt': dateparser.parse(legacy.get('created_at')).isoformat() if len(legacy.get('created_at')) > 3 else '',
+                    'publishedAt': date,
+                    'picture': legacy.get('entities', {}).get('media', [{},{}])[0].get('media_url_https'),
+                    'stats': {
+                        'likes': legacy.get('favorite_count', 0),
+                        'retweets': legacy.get('retweet_count', 0),
+                        'quotes': legacy.get('quote_count', 0),
+                        'replies': legacy.get('reply_count', 0),
+                        'bookmarks': legacy.get('bookmark_count', 0)
+                    }
+                }
+                response['tweets'].append(d)
+                authors.append(content.get('core', {}).get('user_results', {}).get('result', {}).get('legacy', {}))
                 
+        authors_names = [author.get('screen_name') for author in authors]
+        author_mostcommon = Counter(authors_names).most_common(1)
         
+        if not author_mostcommon:
+            logger.error(f'APITwitter - No authors found for "{self.username}"')
+            raise ValueError('No matching author found')
+
+        author = [i for i in authors if i.get('screen_name') == author_mostcommon[0][0]][0]
+        response['profile'].update({
+            'username': author.get('screen_name'),
+            'img': author.get('profile_image_url_https', TwitterConfig.DEFAULT_IMG),
+            'stats': {
+                'followers': author.get('followers_count', 0),
+                'media': author.get('media_count', 0),
+                'friends': author.get('friends_count', 0),
+                'status': author.get('statuses_count', 0)
+            }
+        })
+        if len(response.get('tweets', [])) == 0:
+            return {}
+        more_stats = {}
+        for key in response.get('tweets', [{}])[0].get('stats', {}).keys():
+            print(more_stats)
+            more_stats[f'Avg{key}'] = 0
+            for tweet in response.get('tweets', []):
+                more_stats[f'Avg{key}'] += tweet.get('stats', {}).get(key, 0)
+            more_stats[f'Avg{key}'] /= len(response.get('tweets', []))
+        
+        response['profile']['stats'].update(more_stats)
+        
+        return response
     
     def __nitter_clean(self, profile, tweets) -> dict:
         """Clear fetched data and add statistics for nitter"""
@@ -492,23 +555,22 @@ class APITwitter(APIBase):
             - 'profile' (dict): A dictionary containing the user's profile information.
             - 'tweets' (list): A list of dictionaries where each dictionary represents a tweet.
         """
-        logger.info(f'APITwitter - Making Scrape for "{self.username}"')
-        aaa = self.__scrape_play()
-        print(aaa)
-        self.__play_clean(aaa)
-        return {'result': aaa}
         if cache:
             response = self._cache(self.params,cache_time=TwitterConfig.CACHE_TIMEDELTA)
             if response:
                 logger.info(f'APITwitter - {self.service} Data Cache Response Success for "{self.username}"')
                 return response
         
-        logger.info(f'APITwitter - Making Scrape for "{self.username}"')
-        scraper = Nitter(log_level=TwitterConfig.LOG_LEVEL, skip_instance_check=TwitterConfig.SKIP_INSTANCE_CHECK)
-        tweets = self.__get_tweets(scraper)
-        profile = self.__get_profile_info(scraper)
+        logger.info(f'APITwitter - Making Scrape Play for "{self.username}"')
+        play = self.__scrape_play()
+        result = self.__play_clean(play)
         
-        if not tweets or not profile:
+        if not result:
+            logger.info(f'APITwitter - Making Scrape Play failed for "{self.username}" - Making Nitter scrape')
+            t, p = self.__scrape_nitter()
+            result = self.__nitter_clean(p,t)
+       
+        if not result:
             logger.error(f'APITwitter - Twitter Scraper no fetch for "{self.username}"')
             return {
                 'status': HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -519,10 +581,66 @@ class APITwitter(APIBase):
         response = {
             'status': HTTPStatus.OK,
             'cache_response': False,
-            'result': self.__clean(profile, tweets)
+            'result': result
         }        
         self.save(response['result'])
         return response
+
+    def save(self, data: dict) -> None:
+        """Save the response to the db"""
+        self._save(params=self.params, data=data)
+        
+    def last_request(self, date_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)):
+        """
+        Search last response after selected date of the object
+        
+        :params datetime: must be in utc like 'datetime.datetime(tzinfo=datetime.timezone.utc)'
+        :return: None if not match and object if it's found
+        """
+        return self._last_request(self.params, date_time)
+    
+    def all(self, unique = False):
+        """
+        Return a list of requests
+        
+        :param unique: gives only a set of requests by days
+        """
+        data = super()._all().filter(params=self.params)
+        if not unique:
+            return data
+        days = set([q.created_at.date() for q in data])
+        return [data.filter(created_at__date=day).first() for day in days]
+    
+    def history(self):
+        service_requests = self.all(unique=True)
+        
+        ids = set([str(post.get('url')).split('/')[-1] for service_request in service_requests for post in service_request.data.get('tweets', [])])
+        post_story= []
+        for id in ids:
+            d = {
+                'id': id,
+                'stats': {}
+            }
+            for service_request in service_requests:
+                posts = service_request.data.get('tweets', [])
+                for post in posts:
+                    if id == post.get('id'):
+                        stats: dict = post.get('stats', {})
+                        for key, value in stats.items():
+                            if not key in d['stats']:
+                                d['stats'][key] = []
+                            d['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+            post_story.append(d)
+        
+        profile_story = {'stats': {}}
+        for service_request in service_requests:
+            stats: dict = service_request.data.get('profile', {}).get('stats', {})
+            for key, value in stats.items():
+                if not key in profile_story['stats']:
+                    profile_story['stats'][key] = []
+                profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
+                        
+        return {'profile': profile_story, 'tweets': post_story}
     
 class APIYoutube(APIBase):
     
