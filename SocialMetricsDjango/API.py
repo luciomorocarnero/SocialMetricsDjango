@@ -36,7 +36,7 @@ class APIBase:
             logger.error(f'APIBase - service: {self.service} - error saving request: {e}')
 
     def _all(self):
-        return ServiceRequest.objects.filter(service=self.service)
+        return ServiceRequest.objects.filter(service=self.service).order_by('-created_at')
     
     def _last_request(
         self, params: dict, 
