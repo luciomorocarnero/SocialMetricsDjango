@@ -59,12 +59,12 @@ Promise.all([
             video_container.appendChild(clon);
         });
 
-        loadChart('myChart', statsHistory.avgViews, 'Average Views');
-        loadChart('myChart2', statsHistory.avgLikes, 'Average Likes');
-        loadChart('myChart3', statsHistory.avgComments, 'Average Likes');
-        loadChart('myChart4', statsHistory.subscribers, 'Subs');
-        loadChart('myChart5', statsHistory.views, 'views');
-        loadChart('myChart6', statsHistory.videos, 'videos');
+        loadChart('myChart', statsHistory.avgViews, 'Average Views',[153, 55, 200]);
+        loadChart('myChart2', statsHistory.avgLikes, 'Average Likes',[54, 162, 235]);
+        loadChart('myChart3', statsHistory.avgComments, 'Average Comments',[75, 192, 192]);
+        loadChart('myChart4', statsHistory.subscribers, 'Followers',[255, 159, 64]);
+        loadChart('myChart5', statsHistory.views, 'Views',[204, 0, 0]);
+        loadChart('myChart6', statsHistory.videos, 'Videos',[255, 99, 132]);
     })
     .catch(error => {
         console.error('Hubo un problema con las solicitudes fetch:', error);
@@ -99,8 +99,8 @@ function loadChart(selector, data, title, color) {
             datasets: [
                 {
                     data: values,
-                    borderColor: 'rgba(153, 102, 255, 1)',
-                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    borderColor: `rgba(${color[0]},${color[1]},${color[2]},1)`,
+                    backgroundColor: `rgba(${color[0]},${color[1]},${color[2]},0.3)`,
                     fill: true,
                     yAxisID: 'y'
                 },
@@ -113,10 +113,11 @@ function loadChart(selector, data, title, color) {
                 title: {
                     display: true,
                     text: title,
+                    color: getComputedStyle(document.body).getPropertyValue('--color-text'),
                     font: {
-                        family: 'Poppins', // Aquí especificas la fuente
-                        weight: '600',     // Puedes especificar el peso (normalmente 400, 600, 700, etc.)
-                        size: 24           // El tamaño de la fuente
+                        family: 'Poppins',
+                        weight: '600',
+                        size: '16px'
                     },
                 },
                 legend: {
@@ -127,11 +128,18 @@ function loadChart(selector, data, title, color) {
                 x: {
                     type: 'category',
                     title: {
-                        display: true,
-                        text: 'Dates'
+                        display: false
                     },
                     reverse: true,
+                    ticks: {
+                        color: getComputedStyle(document.body).getPropertyValue('--color-text'),
+                    }
                 },
+                y: {
+                    ticks: {
+                        color: getComputedStyle(document.body).getPropertyValue('--color-text'),
+                    }
+                }
             }
         }
     })
