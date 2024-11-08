@@ -12,32 +12,40 @@ const options = {
     hour12: false
 };
 
-fetch(url)
-    .then(response => {
+Promise.all([
+    fetch(url).then(response => {
+        if (response.status !== 200) {
+            throw new Error('Error en la red: ' + response.status);
+        }
+        return response.json();
+    }),
+    fetch(url + '&history=3').then(response => {
         if (response.status !== 200) {
             throw new Error('Error en la red: ' + response.status);
         }
         return response.json();
     })
-    .then(data => {
-        const profile = data.result.profile;
-        const stats = profile.stats
+])
+    .then(([data1, data2]) => {
+        const profile = data1.result.profile;
+        let stats = profile.stats;
         $('#username').textContent = profile.name;
         $('.picture img').src = profile.image;
         $(".picture").addEventListener('click', () => {
             window.open(`https://www.youtube.com/channel/${profile.id}`, '_blank');
-        })
+        });
 
-        $('#views-count').textContent = stats.views.toLocaleString('en-US');
-        $('#followers-count').textContent = stats.subscribers.toLocaleString('en-US');
-        $('#videos-count').textContent = stats.videos.toLocaleString('en-US');
-        $('#avgViews-count').textContent = stats.avgViews.toLocaleString('en-US');
-        $('#avgLikes-count').textContent = stats.avgLikes.toLocaleString('en-US');
-        $('#avgComments-count').textContent = stats.avgComments.toLocaleString('en-US');
+        let statsHistory = data2.result.profile.stats;
+        diff(statsHistory.views[0].value, statsHistory.views[1].value, $('#views-count'));
+        diff(statsHistory.subscribers[0].value, statsHistory.subscribers[1].value, $('#followers-count'));
+        diff(statsHistory.videos[0].value, statsHistory.videos[1].value, $('#videos-count'));
+        diff(statsHistory.avgViews[0].value, statsHistory.avgViews[1].value, $('#avgViews-count'));
+        diff(statsHistory.avgLikes[0].value, statsHistory.avgLikes[1].value, $('#avgLikes-count'));
+        diff(statsHistory.avgComments[0].value, statsHistory.avgComments[1].value, $('#avgComments-count'));
 
         const video_template = $('#video-template');
         const video_container = $('#videos');
-        const videos = data.result.videos;
+        const videos = data1.result.videos;
         videos.forEach(e => {
             let clon = document.importNode(video_template.content, true);
             clon.querySelector('.video > span').innerText = e.title;
@@ -50,45 +58,81 @@ fetch(url)
             clon.querySelector('.video-likes').innerText = e.stats.likeCount.toLocaleString('en-US');
             video_container.appendChild(clon);
         });
+
+        loadChart('myChart', statsHistory.avgViews, 'Average Views');
+        loadChart('myChart2', statsHistory.avgLikes, 'Average Likes');
+        loadChart('myChart3', statsHistory.avgComments, 'Average Likes');
+        loadChart('myChart4', statsHistory.subscribers, 'Subs');
+        loadChart('myChart5', statsHistory.views, 'views');
+        loadChart('myChart6', statsHistory.videos, 'videos');
     })
     .catch(error => {
-        console.error('Hubo un problema con la solicitud fetch:', error);
-    })
-    .then(
-        fetch(url + '&history=3')
-            .then(response => {
-                if (response.status !== 200) {
-                    throw new Error('Error en la red: ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                let stats = data.result.profile.stats;
-                
-                diff(stats.views[0].value,stats.views[1].value,$('#views-count'));
-                diff(stats.subscribers[0].value,stats.subscribers[1].value,$('#followers-count'));
-                diff(stats.videos[0].value,stats.videos[1].value,$('#videos-count'));
-                diff(stats.avgViews[0].value,stats.avgViews[1].value,$('#avgViews-count'));
-                diff(stats.avgLikes[0].value,stats.avgLikes[1].value,$('#avgLikes-count'));
-                diff(stats.avgComments[0].value,stats.avgComments[1].value,$('#avgComments-count'));
-
-            })
-    )
+        console.error('Hubo un problema con las solicitudes fetch:', error);
+    });
 
 function diff(numeroActual, numeroAnterior, element) {
     const diferencia = numeroActual - numeroAnterior;
     const base = element
-    const diferenciaElemento = document.createElement('span');
-
-
     if (diferencia > 0) {
-        diferenciaElemento.textContent = ` (+${diferencia.toLocaleString('en-US')})`;
-        diferenciaElemento.style.color = 'green';
+        base.innerHTML = `${numeroActual.toLocaleString('en-US')} <span class="positive">(+${diferencia.toLocaleString('en-US')})</span>`;
     } else if (diferencia < 0) {
-        diferenciaElemento.textContent = ` (${diferencia.toLocaleString('en-US')})`;
-        diferenciaElemento.style.color = 'red';
-    } else {
-        // diferenciaElemento.textContent = ' (+0)';
+        base.innerHTML = `${numeroActual.toLocaleString('en-US')} <span class="negative">(${diferencia.toLocaleString('en-US')})</span>`;
     }
-    base.appendChild(diferenciaElemento);
+    else {
+        base.innerHTML = `${numeroActual.toLocaleString('en-US')}`;
+    }
+}
+
+function loadChart(selector, data, title, color) {
+
+    // Extraer las fechas (eje X)
+    const labels = data.map(item => item.date);
+
+    const values = data.map(item => item.value);
+
+    // Configurar el gráfico
+    const ctx = document.getElementById(selector).getContext('2d');
+    const myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    data: values,
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    fill: true,
+                    yAxisID: 'y'
+                },
+            ]
+        },
+        options: {
+            manitainAspectRatio: false,
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: title,
+                    font: {
+                        family: 'Poppins', // Aquí especificas la fuente
+                        weight: '600',     // Puedes especificar el peso (normalmente 400, 600, 700, etc.)
+                        size: 24           // El tamaño de la fuente
+                    },
+                },
+                legend: {
+                    display: false,
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    title: {
+                        display: true,
+                        text: 'Dates'
+                    },
+                    reverse: true,
+                },
+            }
+        }
+    })
 }

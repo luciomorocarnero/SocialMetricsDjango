@@ -52,3 +52,12 @@ themeSwitch.addEventListener("click", () => {
     darkmode !== 'active' ? enableDarkmode() : disableDarkmode()
 })
 
+document.addEventListener('DOMContentLoaded', () => {
+    const pathname = window.location.pathname;
+    const segments = pathname.split('/');
+    const part = segments[1];
+    let li = document.getElementById(part);
+    if (li) {
+        li.classList.add('active');
+    }
+});

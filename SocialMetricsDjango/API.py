@@ -257,7 +257,6 @@ class APITwitter(APIBase):
             return {}
         more_stats = {}
         for key in response.get('tweets', [{}])[0].get('stats', {}).keys():
-            print(more_stats)
             more_stats[f'Avg{key}'] = 0
             for tweet in response.get('tweets', []):
                 more_stats[f'Avg{key}'] += tweet.get('stats', {}).get(key, 0)
@@ -407,7 +406,10 @@ class APITwitter(APIBase):
                 if not key in profile_story['stats']:
                     profile_story['stats'][key] = []
                 profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                        
+        
+        for key, value in profile_story.get('stats', {}).items():
+            profile_story['stats'][key] = sorted(value, key=lambda x: x['date'], reverse=True)
+        
         return {'profile': profile_story, 'tweets': post_story}
     
 class APIYoutube(APIBase):
@@ -641,7 +643,10 @@ class APIYoutube(APIBase):
                 if not key in profile_story['stats']:
                     profile_story['stats'][key] = []
                 profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                        
+
+        for key, value in profile_story.get('stats', {}).items():
+            profile_story['stats'][key] = sorted(value, key=lambda x: x['date'], reverse=True)
+        
         return {'profile': profile_story, 'videos': post_story}
 
 class APIIntagram(APIBase):
@@ -781,7 +786,10 @@ class APIIntagram(APIBase):
                 if not key in profile_story['stats']:
                     profile_story['stats'][key] = []
                 profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                        
+
+        for key, value in profile_story.get('stats', {}).items():
+            profile_story['stats'][key] = sorted(value, key=lambda x: x['date'], reverse=True)
+
         return {'profile': profile_story, 'posts': post_story}
 
 class APITiktok(APIBase):
@@ -1001,5 +1009,8 @@ class APITiktok(APIBase):
                 if not key in profile_story['stats']:
                     profile_story['stats'][key] = []
                 profile_story['stats'][key].append({'value': value, 'date':service_request.created_at.date().isoformat()})
-                        
+
+        for key, value in profile_story.get('stats', {}).items():
+            profile_story['stats'][key] = sorted(value, key=lambda x: x['date'], reverse=True)
+           
         return {'profile': profile_story, 'tiktoks': post_story}
