@@ -16,7 +16,7 @@ urlsView = [
     path('twitter',views.twitter, name='twitter'),
     path('youtube',views.youtube, name='youtube'),
     path('instagram',views.instagram, name='instagram'),
-    path('facebook',views.tiktok, name='tiktok'),
+    path('tiktok',views.tiktok, name='tiktok'),
 ]
 
 urlpatterns = urlsAPI + urlsView

@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
-const url = '/api/youtube?userName=@joerogan';
+const url = '/api/instagram?userName=joerogan';
 
 const options = {
     day: '2-digit',
@@ -29,59 +29,63 @@ Promise.all([
     .then(([data1, data2]) => {
         const profile = data1.result.profile;
         let stats = profile.stats;
-        $('#username').textContent = profile.name;
-        $('.picture img').src = profile.image;
-        $(".picture").addEventListener('click', () => {
-            window.open(`https://www.youtube.com/channel/${profile.id}`, '_blank');
-        });
+        $('#username').textContent = profile.username;
+        $('.picture img').src = `data:image/jpeg;base64,${profile.image}`;
+        // $(".picture").addEventListener('click', () => {
+        //     window.open(`https://x.com/${profile.username}`, '_blank');
+        // });
 
         let statsHistory = data2.result.profile.stats;
-        diff(statsHistory.views[0].value, statsHistory.views[1].value, $('#views-count'));
-        diff(statsHistory.subscribers[0].value, statsHistory.subscribers[1].value, $('#followers-count'));
-        diff(statsHistory.videos[0].value, statsHistory.videos[1].value, $('#videos-count'));
-        diff(statsHistory.avgViews[0].value, statsHistory.avgViews[1].value, $('#avgViews-count'));
-        diff(statsHistory.avgLikes[0].value, statsHistory.avgLikes[1].value, $('#avgLikes-count'));
-        diff(statsHistory.avgComments[0].value, statsHistory.avgComments[1].value, $('#avgComments-count'));
+        diff(statsHistory.following[0]?.value, statsHistory.following[1]?.value, $('#friends-count'));
+        diff(statsHistory.followers[0]?.value, statsHistory.followers[1]?.value, $('#followers-count'));
+        diff(statsHistory.media[0]?.value, statsHistory.media[1]?.value, $('#media-count'));
+        diff(statsHistory.Avglikes[0]?.value, statsHistory.Avglikes[1]?.value, $('#avgLikes-count'));
 
-        const video_template = $('#video-template');
-        const video_container = $('#videos');
-        const videos = data1.result.videos;
-        videos.forEach(e => {
-            let clon = document.importNode(video_template.content, true);
-            clon.querySelector('.video > span').innerText = e.title;
-            clon.querySelector('.video > img').src = e.image;
-            clon.querySelector(".video > img").addEventListener('click', () => { window.open(`https://www.youtube.com/watch?v=${e.id}`, '_blank') })
-            date = new Date(e.publishedAt);
-            clon.querySelector('.video-footer > .video-date').innerText = date.toLocaleString('en-Us', options).replace(',', '');
-            clon.querySelector('.video-views').innerText = e.stats.viewCount.toLocaleString('en-US');
-            clon.querySelector('.video-comments').innerText = e.stats.commentCount.toLocaleString('en-US');
-            clon.querySelector('.video-likes').innerText = e.stats.likeCount.toLocaleString('en-US');
-            video_container.appendChild(clon);
-        });
+        // const tweet_template = $('#tweet-template');
+        // const tweet_container = $('#tweets');
+        // const tweets = data1.result.posts;
+        // tweets.forEach(e => {
+        //     let clon = document.importNode(tweet_template.content, true);
+        //     clon.querySelector('.video > span').innerText = removeLinks(e.caption);
+        //     clon.querySelector('.video > img').src = e.image;
+        //     // clon.querySelector('.video').addEventListener('dblclick', () => { window.open(e.url, '_blank') })
+        //     date = new Date(e.publishedAt);
+        //     clon.querySelector('.video-footer > .video-date').innerText = date.toLocaleString('en-Us', options).replace(',', '');
+        //     clon.querySelector('.video-comments').innerText = e.stats.comments.toLocaleString('en-US');
+        //     clon.querySelector('.video-likes').innerText = e.stats.likes.toLocaleString('en-US');
+        //     tweet_container.appendChild(clon);
+        // });
 
-        loadChart('myChart', statsHistory.avgViews, 'Average Views',[153, 55, 200]);
-        loadChart('myChart2', statsHistory.avgLikes, 'Average Likes',[54, 162, 235]);
-        loadChart('myChart3', statsHistory.avgComments, 'Average Comments',[75, 192, 192]);
-        loadChart('myChart4', statsHistory.subscribers, 'Followers',[255, 159, 64]);
-        loadChart('myChart5', statsHistory.views, 'Views',[204, 0, 0]);
-        loadChart('myChart6', statsHistory.videos, 'Videos',[255, 99, 132]);
+        loadChart('myChart', statsHistory.following, 'Average Following',[153, 55, 200]);
+        loadChart('myChart2', statsHistory.followers, 'Average Followers',[54, 162, 235]);
+        loadChart('myChart3', statsHistory.media, 'Average Media',[75, 192, 192]);
+        loadChart('myChart4', statsHistory.Avglikes, 'Average Likes',[255, 159, 64]);
+        loadChart('myChart5', statsHistory.Avgcomments, 'Avgerage Comments',[204, 0, 0]);
     })
     .catch(error => {
         console.error('Hubo un problema con las solicitudes fetch:', error);
     });
 
 function diff(numeroActual, numeroAnterior, element) {
-    const diferencia = numeroActual - numeroAnterior;
+    const diferencia = parseInt(numeroActual, 10) - parseInt(numeroAnterior, 10);
     const base = element
     if (diferencia > 0) {
-        base.innerHTML = `${numeroActual.toLocaleString('en-US')} <span class="positive">(+${diferencia.toLocaleString('en-US')})</span>`;
+        base.innerHTML = `${parseInt(numeroActual, 10).toLocaleString('en-US')} <span class="positive">(+${diferencia.toLocaleString('en-US')})</span>`;
     } else if (diferencia < 0) {
-        base.innerHTML = `${numeroActual.toLocaleString('en-US')} <span class="negative">(${diferencia.toLocaleString('en-US')})</span>`;
+        base.innerHTML = `${parseInt(numeroActual, 10).toLocaleString('en-US')} <span class="negative">(${diferencia.toLocaleString('en-US')})</span>`;
     }
     else {
-        base.innerHTML = `${numeroActual.toLocaleString('en-US')}`;
+        base.innerHTML = `${parseInt(numeroActual, 10).toLocaleString('en-US')}`;
     }
 }
+
+function removeLinks(str) {
+    // Expresión regular para buscar URLs
+    const regex = /https?:\/\/[^\s]+/g;
+    
+    // Reemplazar las URLs por una cadena vacía
+    return str.replace(regex, '').trim();
+  }
 
 function loadChart(selector, data, title, color) {
 

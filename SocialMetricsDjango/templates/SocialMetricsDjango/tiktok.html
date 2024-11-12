@@ -11,14 +11,6 @@
         <div class="statBox">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
                 <path
-                    d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z" />
-            </svg>
-            <span id="views-count">no found</span>
-            <span>Total Views</span>
-        </div>
-        <div class="statBox">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
-                <path
                     d="M0-240v-63q0-43 44-70t116-27q13 0 25 .5t23 2.5q-14 21-21 44t-7 48v65H0Zm240 0v-65q0-32 17.5-58.5T307-410q32-20 76.5-30t96.5-10q53 0 97.5 10t76.5 30q32 20 49 46.5t17 58.5v65H240Zm540 0v-65q0-26-6.5-49T754-397q11-2 22.5-2.5t23.5-.5q72 0 116 26.5t44 70.5v63H780Zm-455-80h311q-10-20-55.5-35T480-370q-55 0-100.5 15T325-320ZM160-440q-33 0-56.5-23.5T80-520q0-34 23.5-57t56.5-23q34 0 57 23t23 57q0 33-23 56.5T160-440Zm640 0q-33 0-56.5-23.5T720-520q0-34 23.5-57t56.5-23q34 0 57 23t23 57q0 33-23 56.5T800-440Zm-320-40q-50 0-85-35t-35-85q0-51 35-85.5t85-34.5q51 0 85.5 34.5T600-600q0 50-34.5 85T480-480Zm0-80q17 0 28.5-11.5T520-600q0-17-11.5-28.5T480-640q-17 0-28.5 11.5T440-600q0 17 11.5 28.5T480-560Zm1 240Zm-1-280Z" />
             </svg>
             <span id="followers-count">no found</span>
@@ -29,8 +21,8 @@
                 <path
                     d="m160-800 80 160h120l-80-160h80l80 160h120l-80-160h80l80 160h120l-80-160h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z" />
             </svg>
-            <span id="videos-count">no found</span>
-            <span>Videos</span>
+            <span id="shares-count">no found</span>
+            <span>Shares</span>
         </div>
         <div class="statBox">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
@@ -85,14 +77,9 @@
             <canvas id="myChart5" style="width:100%;height:100%;"></canvas>
         </div>
     </div>
-    <div class="chartCard">
-        <div class="chartBox">
-            <canvas id="myChart6" style="width:100%;height:100%;"></canvas>
-        </div>
-    </div>
 </div>
 
-<div class="container" id="videos"></div>
+<div class="container" id="tweets"></div>
 
 <template id="video-template">
     <div class="video">
@@ -126,5 +113,5 @@
         </div>
     </div>
 </template>
-<script type="text/javascript" src="{% static 'js/youtube.js' %}" defer></script>
+<script type="text/javascript" src="{% static 'js/tiktok.js' %}" defer></script>
 {% endblock %}

@@ -182,10 +182,11 @@ def youtube(request):
     return render(request, 'SocialMetricsDjango/youtube.html')
 
 def tiktok(request):
-    return render(request, 'base.html', {'active': 'tiktok'})
+    return render(request, 'SocialMetricsDjango/tiktok.html')
 
 def instagram(request):
-    return render(request, 'base.html', {'active': 'instagram'})
+    return render(request, 'SocialMetricsDjango/instagram.html')
+
 
 def twitter(request):
-    return render(request, 'base.html', {'active': 'twitter'})
+    return render(request, 'SocialMetricsDjango/twitter.html')

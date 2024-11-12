@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import re
 from .models import ServiceRequest
@@ -128,7 +129,7 @@ class APITwitter(APIBase):
     
     def __scrape_play(self) -> dict:
         response_data = None
-        
+        image_src = None
         def play_handle_response(response):
             nonlocal response_data
             if 'UserTweets?variables' in response.url:
@@ -142,6 +143,7 @@ class APITwitter(APIBase):
                     logger.error(f'APITwitter - Scrape Play - response handle fail: {response.url} - {e}')
               
         def play_run(playwright: Playwright):
+            nonlocal image_src
             # Magic user_agent and cookies from internet
             user_agent = "Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             cookies = [
@@ -155,7 +157,7 @@ class APITwitter(APIBase):
                 }
             ]
 
-            browser = playwright.firefox.launch(headless=True)
+            browser = playwright.firefox.launch(headless=False)
             context = browser.new_context(
                 user_agent=user_agent,
             )
@@ -165,10 +167,17 @@ class APITwitter(APIBase):
             page.on('response', play_handle_response)
             page.goto(f'https://x.com/{self.username}/')
             page.wait_for_timeout(6000) # 6s
+            page.goto(f'https://x.com/{self.username}/photo')
+            page.wait_for_timeout(5000) # 6s
+            image = page.locator('img')
+            image_src = image.get_attribute('src')
             browser.close()
             
         with sync_playwright() as playwright:
             play_run(playwright)
+        
+        if response_data:
+            response_data.update({'photo_url': image_src})
         
         return response_data
     
@@ -245,7 +254,7 @@ class APITwitter(APIBase):
         author = [i for i in authors if i.get('screen_name') == author_mostcommon[0][0]][0]
         response['profile'].update({
             'username': author.get('screen_name'),
-            'img': author.get('profile_image_url_https', TwitterConfig.DEFAULT_IMG),
+            'img': data.get('photo_url', ''),
             'stats': {
                 'followers': author.get('followers_count', 0),
                 'media': author.get('media_count', 0),
@@ -261,7 +270,7 @@ class APITwitter(APIBase):
             for tweet in response.get('tweets', []):
                 more_stats[f'Avg{key}'] += tweet.get('stats', {}).get(key, 0)
             more_stats[f'Avg{key}'] /= len(response.get('tweets', []))
-        
+            more_stats[f'Avg{key}'] = int(more_stats[f'Avg{key}'])
         response['profile']['stats'].update(more_stats)
         
         return response
@@ -660,10 +669,16 @@ class APIIntagram(APIBase):
     def __get(self):
         loader = instaloader.Instaloader()
         profile = instaloader.Profile.from_username(loader.context,self.userName)
+        try:
+            response = requests.get(profile.profile_pic_url)
+            img_base64 = base64.b64encode(response.content).decode('utf-8')
+        except Exception:
+            img_base64 = ''
+        
         d = {
             'profile': {
                 'username': profile.username,
-                'image': profile.profile_pic_url,
+                'image': img_base64,
                 'id': profile.userid,
                 'stats': {
                     'following': profile.followees,
@@ -705,7 +720,15 @@ class APIIntagram(APIBase):
                 }
             }
             d['posts'].append(p)
-            
+        
+        more_stats = {}
+        for key in d.get('posts', [{}])[0].get('stats', {}).keys():
+            more_stats[f'Avg{key}'] = 0
+            for tweet in d.get('posts', []):
+                more_stats[f'Avg{key}'] += tweet.get('stats', {}).get(key, 0)
+            more_stats[f'Avg{key}'] /= len(d.get('posts', []))
+            more_stats[f'Avg{key}'] = int(more_stats[f'Avg{key}'])
+        d['profile']['stats'].update(more_stats)
         return d    
         
     def get(self, cache: bool = True):
@@ -918,7 +941,7 @@ class APITiktok(APIBase):
             'username': author.get('uniqueId'),
             'name': author.get('nickname'),
             'stats': {
-                'followers': self.scrape_followers
+                'followers': convert_abbreviated_number(self.scrape_followers)
             }
         }
         
@@ -1014,3 +1037,7 @@ class APITiktok(APIBase):
             profile_story['stats'][key] = sorted(value, key=lambda x: x['date'], reverse=True)
            
         return {'profile': profile_story, 'tiktoks': post_story}
+
+def convert_abbreviated_number(text):
+    match = re.match(r"([0-9\.]+)([KMGT])", text, re.IGNORECASE)
+    return float(match.group(1)) * {'K': 1e3, 'M': 1e6, 'B': 1e9, 'T': 1e12}.get(match.group(2).upper(), 1) if match else None
